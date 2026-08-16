@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hesdor.Api", "server-side\H
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hesdor.Infrastructure.Tests", "server-side\Hesdor.Infrastructure.Tests\Hesdor.Infrastructure.Tests.csproj", "{C7415394-9D83-4C79-85BB-9614DCAFC81A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Hesdor.EdgeAgent", "server-side\Hesdor.EdgeAgent\Hesdor.EdgeAgent.csproj", "{385DAF1A-9F78-40A9-B2A1-3447E79C57A3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +46,10 @@ Global
 		{C7415394-9D83-4C79-85BB-9614DCAFC81A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C7415394-9D83-4C79-85BB-9614DCAFC81A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C7415394-9D83-4C79-85BB-9614DCAFC81A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{385DAF1A-9F78-40A9-B2A1-3447E79C57A3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{385DAF1A-9F78-40A9-B2A1-3447E79C57A3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{385DAF1A-9F78-40A9-B2A1-3447E79C57A3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{385DAF1A-9F78-40A9-B2A1-3447E79C57A3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{1E36D585-A578-4F5E-AFA0-936847AA24DF} = {29EEB137-9A8E-44CC-9DF7-B5DFEB1D5FEC}
@@ -51,5 +57,6 @@ Global
 		{F66E5607-11DD-40C1-BCFA-04D60731BD44} = {29EEB137-9A8E-44CC-9DF7-B5DFEB1D5FEC}
 		{4812038C-CC80-4A0D-8BA5-DB35EF8BA0C1} = {29EEB137-9A8E-44CC-9DF7-B5DFEB1D5FEC}
 		{C7415394-9D83-4C79-85BB-9614DCAFC81A} = {29EEB137-9A8E-44CC-9DF7-B5DFEB1D5FEC}
+		{385DAF1A-9F78-40A9-B2A1-3447E79C57A3} = {29EEB137-9A8E-44CC-9DF7-B5DFEB1D5FEC}
 	EndGlobalSection
 EndGlobal

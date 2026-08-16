@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Hesdor.Infrastructure\Hesdor.Infrastructure.csproj" />
     <ProjectReference Include="..\Hesdor.Application\Hesdor.Application.csproj" />
     <ProjectReference Include="..\Hesdor.Domain\Hesdor.Domain.csproj" />
+    <ProjectReference Include="..\Hesdor.EdgeAgent\Hesdor.EdgeAgent.csproj" />
   </ItemGroup>
 
 </Project>

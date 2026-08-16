@@ -111,8 +111,11 @@ public sealed class EdgeController : ControllerBase
             rule.IsAllowed,
             rule.Priority
         }).ToArrayAsync(cancellationToken);
+        var employees = await _dbContext.Employees.IgnoreQueryFilters().Where(employee => employee.TenantId == edgeAgent.TenantId).Select(employee => new { employee.Id, employee.EmploymentStatus }).ToArrayAsync(cancellationToken);
+        var employeeProfiles = await _dbContext.EmployeeAccessProfiles.IgnoreQueryFilters().Where(assignment => assignment.TenantId == edgeAgent.TenantId).Select(assignment => new { assignment.EmployeeId, assignment.AccessProfileId, assignment.ValidFromUtc, assignment.ValidToUtc }).ToArrayAsync(cancellationToken);
+        var temporaryGrants = await _dbContext.TemporaryAccessGrants.IgnoreQueryFilters().Where(grant => grant.TenantId == edgeAgent.TenantId && !grant.IsRevoked && grant.ValidToUtc > DateTime.UtcNow).Select(grant => new { grant.EmployeeId, grant.ZoneId, grant.DoorId, grant.ValidFromUtc, grant.ValidToUtc }).ToArrayAsync(cancellationToken);
 
-        return Ok(new { edgeAgent.Id, edgeAgent.ConfigVersion, credentials, doors, rules });
+        return Ok(new { edgeAgent.Id, edgeAgent.ConfigVersion, credentials, doors, rules, employees, employeeProfiles, temporaryGrants });
     }
 
     [HttpPost("events")]
