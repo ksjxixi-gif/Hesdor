@@ -63,7 +63,8 @@ public sealed class AuthenticationService : IAuthenticationService
             Status = TenantStatus.Active,
             TrialEndsAtUtc = now.AddDays(14),
             Locale = "en-US",
-            TimeZone = "UTC"
+            TimeZone = "UTC",
+            IsPlatform = true // first bootstrapped tenant is the Hesdor platform team
         };
         var user = new User
         {

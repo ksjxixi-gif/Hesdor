@@ -11,6 +11,7 @@ public sealed class Tenant : AuditableEntity
     public string? Locale { get; set; }
     public DateTime? TrialEndsAtUtc { get; set; }
     public Guid? OwnerUserId { get; set; }
+    public bool IsPlatform { get; set; }
 }
 
 public enum TenantPlan { Free = 0, Starter = 1, Business = 2, Enterprise = 3 }

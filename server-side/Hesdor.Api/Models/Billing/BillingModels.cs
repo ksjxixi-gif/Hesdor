@@ -30,3 +30,32 @@ public sealed record PlanResponse(Guid Id, string Code, string Name, decimal Mon
 public sealed record SubscriptionResponse(Guid Id, Guid PlanId, SubscriptionStatus Status, BillingCycle BillingCycle, BillingProvider Provider, DateTime StartedAtUtc, DateTime CurrentPeriodStartUtc, DateTime CurrentPeriodEndUtc, DateTime? TrialEndsAtUtc, DateTime? GracePeriodEndsAtUtc, bool CancelAtPeriodEnd, DateTime? CanceledAtUtc);
 
 public sealed record EntitlementResponse(Guid TenantId, string PlanCode, SubscriptionStatus SubscriptionStatus, DateTime CurrentPeriodEndUtc, IReadOnlyCollection<Feature> EnabledFeatures, IReadOnlyDictionary<LimitType, long> Limits);
+
+public sealed record AdminPlanResponse(Guid Id, string Code, string Name, decimal MonthlyPrice, decimal AnnualPrice, string CurrencyCode, bool IsActive, IReadOnlyCollection<string> Features, IReadOnlyDictionary<string, long> Limits);
+
+public sealed class CreatePlanRequest
+{
+    [Required, StringLength(40, MinimumLength = 3)] public string Code { get; set; } = string.Empty;
+    [Required, StringLength(80)] public string Name { get; set; } = string.Empty;
+    [Range(0, 1_000_000)] public decimal MonthlyPrice { get; set; }
+    [Range(0, 10_000_000)] public decimal AnnualPrice { get; set; }
+    [StringLength(3, MinimumLength = 3)] public string? CurrencyCode { get; set; }
+    public bool IsActive { get; set; } = true;
+    public IReadOnlyCollection<string> Features { get; set; } = [];
+    public IReadOnlyDictionary<string, long> Limits { get; set; } = new Dictionary<string, long>();
+}
+
+public sealed class UpdatePlanRequest
+{
+    [StringLength(80)] public string? Name { get; set; }
+    [Range(0, 1_000_000)] public decimal? MonthlyPrice { get; set; }
+    [Range(0, 10_000_000)] public decimal? AnnualPrice { get; set; }
+    [StringLength(3, MinimumLength = 3)] public string? CurrencyCode { get; set; }
+    public bool? IsActive { get; set; }
+}
+
+public sealed class UpdatePlanDetailsRequest
+{
+    public IReadOnlyCollection<string>? Features { get; set; }
+    public IReadOnlyDictionary<string, long>? Limits { get; set; }
+}

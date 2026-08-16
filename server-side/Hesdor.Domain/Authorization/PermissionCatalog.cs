@@ -37,5 +37,6 @@ public static class PermissionCatalog
         new("settings.manage", "Manage settings", "Settings", "Manage tenant configuration."),
         new("billing.read", "Read billing", "Billing", "View subscription and entitlement state."),
         new("billing.manage", "Manage billing", "Billing", "Manage manual subscriptions and billing state."),
+        new("platform.plans.manage", "Manage platform plans", "Platform", "Define plans, features, and limits. Restricted to the Hesdor platform team."),
     ];
 }
