@@ -41,7 +41,16 @@ public static class DependencyInjection
         services.AddScoped<IMessagingService, MessagingService>();
         services.AddScoped<IEntitlementService, EntitlementService>();
         services.AddScoped<IBillingService, BillingService>();
-        services.AddSingleton<IPaymentProvider, ManualPaymentProvider>();
+        var stripeKey = configuration["Stripe:SecretKey"];
+        if (string.IsNullOrWhiteSpace(stripeKey))
+        {
+            services.AddSingleton<IPaymentProvider, ManualPaymentProvider>();
+        }
+        else
+        {
+            Stripe.StripeConfiguration.ApiKey = stripeKey;
+            services.AddSingleton<IPaymentProvider, StripePaymentProvider>();
+        }
         services.AddSingleton<IAccessControllerAdapter, HesdorNativeAccessControllerAdapter>();
         services.AddSingleton<IEdgeCredentialService, EdgeCredentialService>();
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();

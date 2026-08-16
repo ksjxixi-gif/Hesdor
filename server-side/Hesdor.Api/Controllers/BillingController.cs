@@ -2,10 +2,12 @@ using Hesdor.Api.Authorization;
 using Hesdor.Api.Models.Billing;
 using Hesdor.Application.Billing;
 using Hesdor.Application.Common;
+using Hesdor.Domain.Billing;
 using Hesdor.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Stripe;
 
 namespace Hesdor.Api.Controllers;
 
@@ -17,13 +19,15 @@ public sealed class BillingController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly IEntitlementService _entitlementService;
     private readonly IBillingService _billingService;
+    private readonly IConfiguration _configuration;
 
-    public BillingController(ApplicationDbContext dbContext, ITenantContext tenantContext, IEntitlementService entitlementService, IBillingService billingService)
+    public BillingController(ApplicationDbContext dbContext, ITenantContext tenantContext, IEntitlementService entitlementService, IBillingService billingService, IConfiguration configuration)
     {
         _dbContext = dbContext;
         _tenantContext = tenantContext;
         _entitlementService = entitlementService;
         _billingService = billingService;
+        _configuration = configuration;
     }
 
     [HttpGet("plans")]
@@ -76,5 +80,56 @@ public sealed class BillingController : ControllerBase
         if (!_tenantContext.HasTenant || request.TenantId != _tenantContext.TenantId) return Forbid();
         var result = await _billingService.ProcessWebhookAsync(new BillingWebhookCommand(request.TenantId, request.Provider, request.ExternalEventId, request.EventType, request.PayloadJson), cancellationToken);
         return Ok(result);
+    }
+
+    [HttpPost("webhooks/stripe")]
+    [AllowAnonymous]
+    public async Task<IActionResult> StripeWebhook(CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var payload = await reader.ReadToEndAsync(cancellationToken);
+        var signature = Request.Headers["Stripe-Signature"].FirstOrDefault();
+        var secret = _configuration["Stripe:WebhookSecret"];
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, new ProblemDetails { Title = "Stripe webhooks are not configured.", Status = 503 });
+        }
+
+        Event stripeEvent;
+        try
+        {
+            stripeEvent = EventUtility.ConstructEvent(payload, signature, secret);
+        }
+        catch (StripeException)
+        {
+            return BadRequest(new ProblemDetails { Title = "Invalid Stripe signature.", Status = 400 });
+        }
+
+        // ponytail: tenant binding comes from object metadata (set on Hesdor-created customers).
+        // Events without it (e.g. invoice.* where metadata lives on the parent subscription) are acked and ignored.
+        if (stripeEvent.Data.Object is IHasMetadata hasMetadata
+            && hasMetadata.Metadata.TryGetValue("tenantId", out var tenantIdText)
+            && Guid.TryParse(tenantIdText, out var tenantId))
+        {
+            var existing = await _dbContext.BillingEvents.IgnoreQueryFilters()
+                .AnyAsync(item => item.Provider == BillingProvider.Stripe && item.ExternalEventId == stripeEvent.Id, cancellationToken);
+            if (!existing)
+            {
+                _dbContext.BillingEvents.Add(new BillingEvent
+                {
+                    TenantId = tenantId,
+                    Provider = BillingProvider.Stripe,
+                    ExternalEventId = stripeEvent.Id,
+                    EventType = stripeEvent.Type,
+                    PayloadJson = payload,
+                    Status = BillingEventStatus.Processed,
+                    ReceivedAtUtc = DateTime.UtcNow,
+                    ProcessedAtUtc = DateTime.UtcNow
+                });
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        return Ok(new { received = true });
     }
 }
