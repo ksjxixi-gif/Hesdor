@@ -15,6 +15,7 @@ export type CurrentUser = {
   email: string | null;
   roles: string[];
   permissions: string[];
+  isPlatform: boolean;
 };
 
 export type Tenant = {

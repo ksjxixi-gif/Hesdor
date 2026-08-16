@@ -76,8 +76,8 @@ export const authApi = {
 
 export const identityApi = {
   async me(accessToken: string) {
-    const data = await apiRequest<ApiSchemas["CurrentUserResponse"]>("/api/me", {}, accessToken);
-    return { userId: data.userId ?? "", tenantId: data.tenantId ?? "", email: data.email ?? null, roles: data.roles ?? [], permissions: data.permissions ?? [] } satisfies CurrentUser;
+    const data = await apiRequest<ApiSchemas["CurrentUserResponse"] & { isPlatform?: boolean }>("/api/me", {}, accessToken);
+    return { userId: data.userId ?? "", tenantId: data.tenantId ?? "", email: data.email ?? null, roles: data.roles ?? [], permissions: data.permissions ?? [], isPlatform: data.isPlatform ?? false } satisfies CurrentUser;
   },
 };
 
@@ -144,6 +144,34 @@ export const billingApi = {
   current(accessToken: string) { return apiRequest<{ subscription: Subscription | null; entitlements: EntitlementSnapshot | null }>("/api/billing/current", {}, accessToken); },
   entitlements(accessToken: string) { return apiRequest<EntitlementSnapshot>("/api/entitlements/current", {}, accessToken); },
   plans() { return apiRequest<{ id: string; code: string; name: string; monthlyPrice: number; annualPrice: number; currencyCode: string }[]>("/api/billing/plans"); },
+};
+
+export type AdminPlan = {
+  id: string;
+  code: string;
+  name: string;
+  monthlyPrice: number;
+  annualPrice: number;
+  currencyCode: string;
+  isActive: boolean;
+  features: string[];
+  limits: Record<string, number>;
+};
+
+export const plansApi = {
+  list(accessToken: string) { return apiRequest<AdminPlan[]>("/api/plans", {}, accessToken); },
+  create(accessToken: string, body: { code: string; name: string; monthlyPrice: number; annualPrice: number; currencyCode?: string; isActive: boolean; features: string[]; limits: Record<string, number> }) {
+    return apiRequest<AdminPlan>("/api/plans", { method: "POST", body: JSON.stringify(body) }, accessToken);
+  },
+  update(accessToken: string, id: string, body: { name?: string; monthlyPrice?: number; annualPrice?: number; currencyCode?: string; isActive?: boolean }) {
+    return apiRequest<AdminPlan>(`/api/plans/${id}`, { method: "PUT", body: JSON.stringify(body) }, accessToken);
+  },
+  updateDetails(accessToken: string, id: string, body: { features?: string[]; limits?: Record<string, number> }) {
+    return apiRequest<unknown>(`/api/plans/${id}/details`, { method: "PUT", body: JSON.stringify(body) }, accessToken);
+  },
+  deactivate(accessToken: string, id: string) {
+    return apiRequest<unknown>(`/api/plans/${id}`, { method: "DELETE" }, accessToken);
+  },
 };
 
 export function getApiBaseUrl() { return API_BASE_URL; }

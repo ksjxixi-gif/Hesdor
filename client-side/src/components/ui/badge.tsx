@@ -1,14 +1,18 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-export function Badge({ className, tone = "neutral", ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: "neutral" | "blue" | "cyan" | "green" | "danger" }) {
-  const tones = {
-    neutral: "border-[#2A2E35] bg-[#0B0D11] text-[#8C929C]",
-    blue: "border-[#205BFF]/40 bg-[#205BFF]/10 text-[#6E96FF]",
-    cyan: "border-[#00D4FF]/35 bg-[#00D4FF]/10 text-[#61E7FF]",
-    green: "border-[#28B77B]/35 bg-[#28B77B]/10 text-[#6CE0AD]",
-    danger: "border-[#743D46] bg-[#291B22] text-[#FFB4BA]",
-  };
+export type BadgeTone = "neutral" | "blue" | "cyan" | "green" | "amber" | "red" | "danger";
 
-  return <span className={cn("inline-flex items-center border px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em]", tones[tone], className)} {...props} />;
+const tones: Record<BadgeTone, string> = {
+  neutral: "border-border bg-elevated text-text-muted",
+  blue: "border-accent/30 bg-accent-soft text-accent-ink",
+  cyan: "border-cyan/30 bg-cyan/10 text-cyan",
+  green: "border-green/30 bg-green-soft text-green",
+  amber: "border-amber/30 bg-amber-soft text-amber",
+  red: "border-red/30 bg-red-soft text-red",
+  danger: "border-red/30 bg-red-soft text-red",
+};
+
+export function Badge({ className, tone = "neutral", ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: BadgeTone }) {
+  return <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", tones[tone], className)} {...props} />;
 }

@@ -1,43 +1,102 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --graphite: #0b0d11;
-  --charcoal: #14171c;
-  --steel: #2a2e35;
-  --silver: #8c929c;
-  --platinum: #e6e8eb;
-  --cobalt: #205bff;
+  /* Light theme: warm paper */
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --border: #e4e1da;
+  --border-strong: #d3cfc5;
+  --text: #1a1d23;
+  --text-muted: #5c6470;
+  --text-faint: #9aa1ac;
+  --accent: #205bff;
+  --accent-soft: #e8edff;
+  --accent-ink: #1640cc;
+  --cyan: #0891b2;
+  --green: #15803d;
+  --green-soft: #dcfce7;
+  --amber: #b45309;
+  --amber-soft: #fef3c7;
+  --red: #b91c1c;
+  --red-soft: #fee2e2;
+  --shadow: 0 1px 2px rgb(20 22 28 / 0.05), 0 4px 16px -4px rgb(20 22 28 / 0.08);
+  --ring: rgb(32 91 255 / 0.35);
+}
+
+.dark {
+  /* Dark theme: graphite */
+  --bg: #0b0d11;
+  --surface: #14171c;
+  --elevated: #1b1f26;
+  --border: #2a2e35;
+  --border-strong: #3a3f48;
+  --text: #e6e8eb;
+  --text-muted: #8c929c;
+  --text-faint: #59616c;
+  --accent: #4d7bff;
+  --accent-soft: #16244f;
+  --accent-ink: #9ab4ff;
   --cyan: #00d4ff;
-  --font-sora: "Sora";
-  --font-inter: "Inter";
+  --green: #4ade80;
+  --green-soft: #14331f;
+  --amber: #fbbf24;
+  --amber-soft: #3a2b0e;
+  --red: #f87171;
+  --red-soft: #3a1d1d;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px -8px rgb(0 0 0 / 0.5);
+  --ring: rgb(77 123 255 / 0.5);
 }
 
 @theme inline {
-  --color-background: var(--graphite);
-  --color-foreground: var(--platinum);
-  --font-headline: var(--font-sora);
-  --font-sans: var(--font-inter);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-elevated: var(--elevated);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-cyan: var(--cyan);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+  --color-red: var(--red);
+  --color-red-soft: var(--red-soft);
+  --color-graphite: #0b0d11;
+  --font-headline: "Sora", sans-serif;
+  --font-sans: "Inter", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, monospace;
 }
 
 * {
   box-sizing: border-box;
+  border-color: var(--border);
 }
 
 html,
 body {
   min-height: 100%;
-  background: var(--graphite);
-  color: var(--platinum);
-  font-family: var(--font-inter), Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans), Arial, sans-serif;
 }
 
 body {
   margin: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -47,6 +106,60 @@ a {
 }
 
 ::selection {
-  background: #205bff;
+  background: var(--accent);
   color: #ffffff;
+}
+
+/* Typography patterns: tracking tight on display, tabular figures for data */
+.font-headline {
+  letter-spacing: -0.03em;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focus */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Subtle entrance for cards and rows */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rise {
+  animation: rise 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.live-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
 }

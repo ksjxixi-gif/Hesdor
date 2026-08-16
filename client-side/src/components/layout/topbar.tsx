@@ -1,27 +1,74 @@
 "use client";
 
-import { Bell, Command, LogOut } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bell, LogOut, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { useRealtime } from "@/lib/signalr/realtime-provider";
-import { Button } from "@/components/ui/button";
+import { useTheme } from "@/lib/theme/theme-provider";
+import { Avatar } from "@/components/shared/avatar";
 import { BrandLockup } from "@/components/shared/brand-lockup";
+import { cn } from "@/lib/utils";
 
 export function Topbar() {
   const { user, logout } = useAuth();
   const { isConfigured } = useRealtime();
-  const initials = (user?.email?.slice(0, 2) ?? "HS").toUpperCase();
+  const { theme, toggle } = useTheme();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [menuOpen]);
 
   return (
-    <header className="flex min-h-[72px] items-center justify-between border-b border-[#2A2E35] bg-[#0B0D11] px-5 sm:px-8">
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-bg/80 px-4 backdrop-blur-md sm:px-6">
       <div className="lg:hidden"><BrandLockup compact /></div>
-      <div className="hidden items-center gap-3 lg:flex">
-        <button type="button" className="flex h-10 min-w-[240px] items-center gap-3 border border-[#2A2E35] bg-[#14171C] px-3 text-left text-xs text-[#59616C] transition hover:border-[#205BFF]"><Command size={15} /> Search workspace <span className="ml-auto border border-[#2A2E35] px-1.5 py-0.5 text-[9px] text-[#59616C]">⌘ K</span></button>
-      </div>
-      <div className="flex items-center gap-3">
-        <div className="hidden items-center gap-2 text-[9px] font-bold uppercase tracking-[0.18em] text-[#8C929C] sm:flex"><span className={isConfigured ? "h-1.5 w-1.5 rounded-full bg-[#00D4FF]" : "h-1.5 w-1.5 rounded-full bg-[#59616C]"} />{isConfigured ? "Realtime ready" : "Realtime offline"}</div>
-        <button type="button" aria-label="Notifications" className="grid h-9 w-9 place-items-center border border-transparent text-[#8C929C] transition hover:border-[#2A2E35] hover:bg-[#14171C] hover:text-[#E6E8EB]"><Bell size={16} /></button>
-        <div className="grid h-9 w-9 place-items-center border border-[#2A2E35] bg-[#14171C] text-[10px] font-bold text-[#00D4FF]">{initials}</div>
-        <Button variant="ghost" size="sm" className="hidden sm:inline-flex" onClick={logout}><LogOut size={14} /> Sign out</Button>
+      <div className="hidden lg:block" />
+
+      <div className="flex items-center gap-1.5">
+        <div className="mr-2 hidden items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-text-muted sm:flex">
+          <span className={cn("live-dot h-1.5 w-1.5 rounded-full", isConfigured ? "bg-green" : "bg-text-faint")} />
+          {isConfigured ? "Realtime" : "Offline"}
+        </div>
+
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label="Toggle theme"
+          className="grid h-9 w-9 place-items-center rounded-lg text-text-muted transition hover:bg-elevated hover:text-text"
+        >
+          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+
+        <button type="button" aria-label="Notifications" className="grid h-9 w-9 place-items-center rounded-lg text-text-muted transition hover:bg-elevated hover:text-text">
+          <Bell size={16} />
+        </button>
+
+        <div className="relative" ref={menuRef}>
+          <button type="button" onClick={() => setMenuOpen((open) => !open)} className="flex items-center gap-2 rounded-lg p-1 transition hover:bg-elevated">
+            <Avatar name={user?.email ?? "Hesdor"} />
+          </button>
+          {menuOpen ? (
+            <div className="rise absolute right-0 top-11 w-56 rounded-xl border border-border bg-surface p-1.5 shadow-lg">
+              <div className="border-b border-border px-3 py-2.5">
+                <p className="truncate text-sm font-semibold text-text">{user?.email ?? "Signed in"}</p>
+                <p className="mt-0.5 text-xs text-text-faint">{user?.roles.join(", ") || "Member"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                className="mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-text-muted transition hover:bg-red-soft hover:text-red"
+              >
+                <LogOut size={15} /> Sign out
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </header>
   );

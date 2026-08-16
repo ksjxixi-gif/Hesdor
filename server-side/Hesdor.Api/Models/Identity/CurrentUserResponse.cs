@@ -5,4 +5,5 @@ public sealed record CurrentUserResponse(
     Guid TenantId,
     string? Email,
     IReadOnlyCollection<string> Roles,
-    IReadOnlyCollection<string> Permissions);
+    IReadOnlyCollection<string> Permissions,
+    bool IsPlatform);
