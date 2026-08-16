@@ -1,0 +1,6 @@
+@Hesdor.Api_HostAddress = http://localhost:5089
+
+GET {{Hesdor.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

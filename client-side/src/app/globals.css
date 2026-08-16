@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+:root {
+  --graphite: #0b0d11;
+  --charcoal: #14171c;
+  --steel: #2a2e35;
+  --silver: #8c929c;
+  --platinum: #e6e8eb;
+  --cobalt: #205bff;
+  --cyan: #00d4ff;
+  --font-sora: "Sora";
+  --font-inter: "Inter";
+}
+
+@theme inline {
+  --color-background: var(--graphite);
+  --color-foreground: var(--platinum);
+  --font-headline: var(--font-sora);
+  --font-sans: var(--font-inter);
+  --font-mono: "SFMono-Regular", Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--graphite);
+  color: var(--platinum);
+  font-family: var(--font-inter), Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #205bff;
+  color: #ffffff;
+}
