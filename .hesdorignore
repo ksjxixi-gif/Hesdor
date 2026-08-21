@@ -1,0 +1,10 @@
+# Paths Hesdor should never read or search.
+# Same syntax as .gitignore. .gitignore rules are applied automatically.
+
+.env
+.env.*
+*.pem
+*.key
+secrets/
+dist/
+coverage/
