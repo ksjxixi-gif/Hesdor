@@ -31,7 +31,7 @@ export async function runSetup(): Promise<number> {
   let scriptIdx = 0
 
   const ask = async (question: string): Promise<string> => {
-    if (rl) return (await ask(question)).trim()
+    if (rl) return (await rl.question(question)).trim()
     const answer = scripted[scriptIdx] ?? ''
     scriptIdx++
     console.log(`${question} ${answer}`)
@@ -108,7 +108,7 @@ export async function runSetup(): Promise<number> {
     console.log('  hesdor            # start the agent')
     return 0
   } finally {
-    rl.close()
+    rl?.close()
   }
 }
 
