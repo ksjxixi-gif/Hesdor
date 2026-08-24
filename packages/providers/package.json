@@ -1,12 +1,10 @@
 {
   "name": "@hesdor/providers",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "description": "AI model provider abstraction for Hesdor (OpenAI-compatible, Anthropic-compatible, OpenRouter, and more)",
   "license": "MIT",
-  "publishConfig": {
-    "access": "public"
-  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

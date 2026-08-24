@@ -32,9 +32,9 @@ hesdor run "Fix the failing test"           # full agent: read + edit + execute
 hesdor                                      # interactive TUI
 ```
 
-To publish a release from this monorepo, run `pnpm build` and publish the workspace
-packages with `pnpm -r publish --access public`. After that, users can install the
-CLI with `npm i -g hesdor`.
+To publish a release from this monorepo, run `pnpm build` and publish only the
+bundled CLI with `pnpm --filter hesdor publish --access public`. After that, users
+can install it with `npm i -g hesdor`.
 
 ## Commands
 

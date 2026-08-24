@@ -9,6 +9,5 @@ hesdor setup
 hesdor
 ```
 
-The published CLI depends on the published `@hesdor/*` workspace packages. From
-this repository, build first and publish the workspace packages before publishing
-`hesdor`.
+The published CLI bundles the internal Hesdor runtime, so users only need the
+single `hesdor` package. From this repository, build first and publish the CLI.

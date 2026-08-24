@@ -13,12 +13,12 @@
   "bin": {
     "hesdor": "./bin/hesdor.js"
   },
-  "main": "./dist/cli.js",
+  "main": "./dist/bundle.js",
   "types": "./dist/cli.d.ts",
   "exports": {
     ".": {
       "types": "./dist/cli.d.ts",
-      "default": "./dist/cli.js"
+      "default": "./dist/bundle.js"
     }
   },
   "files": [
@@ -26,18 +26,20 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && esbuild dist/cli.js --bundle --platform=node --format=esm --outfile=dist/bundle.js --external:ink --external:ink-text-input --external:react",
+    "prepack": "pnpm build",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@hesdor/agent-core": "workspace:*",
-    "@hesdor/protocol": "workspace:*",
-    "@hesdor/providers": "workspace:*",
     "ink": "^7.1.1",
     "ink-text-input": "^6.0.0",
     "react": "^19.2.8"
   },
   "devDependencies": {
-    "@types/react": "^19.2.18"
+    "@hesdor/agent-core": "workspace:*",
+    "@hesdor/protocol": "workspace:*",
+    "@hesdor/providers": "workspace:*",
+    "@types/react": "^19.2.18",
+    "esbuild": "^0.28.2"
   }
 }

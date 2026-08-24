@@ -32,15 +32,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@hesdor/agent-core':
-        specifier: workspace:*
-        version: link:../agent-core
-      '@hesdor/protocol':
-        specifier: workspace:*
-        version: link:../protocol
-      '@hesdor/providers':
-        specifier: workspace:*
-        version: link:../providers
       ink:
         specifier: ^7.1.1
         version: 7.1.1(@types/react@19.2.18)(react@19.2.8)
@@ -51,9 +42,21 @@ importers:
         specifier: ^19.2.8
         version: 19.2.8
     devDependencies:
+      '@hesdor/agent-core':
+        specifier: workspace:*
+        version: link:../agent-core
+      '@hesdor/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@hesdor/providers':
+        specifier: workspace:*
+        version: link:../providers
       '@types/react':
         specifier: ^19.2.18
         version: 19.2.18
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
 
   packages/protocol: {}
 
