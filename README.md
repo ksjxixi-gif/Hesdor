@@ -11,10 +11,10 @@ Requires Node.js 22+.
 ```bash
 git clone https://github.com/hesdor/hesdor && cd hesdor
 pnpm install && pnpm build
-pnpm --filter hesdor link --global
+pnpm --filter @dean_overlord/hesdor link --global
 
-# Or install the published CLI (after the Hesdor packages are published):
-npm i -g hesdor
+# Or install the published CLI:
+npm i -g @dean_overlord/hesdor
 ```
 
 ## Quick start
@@ -33,8 +33,8 @@ hesdor                                      # interactive TUI
 ```
 
 To publish a release from this monorepo, run `pnpm build` and publish only the
-bundled CLI with `pnpm --filter hesdor publish --access public`. After that, users
-can install it with `npm i -g hesdor`.
+bundled CLI with `pnpm --filter @dean_overlord/hesdor publish --access public`.
+The installed command is still `hesdor`.
 
 ## Commands
 
