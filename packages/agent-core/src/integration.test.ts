@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -29,7 +29,7 @@ function makeCtx(mode: ToolContext['mode']): { ctx: ToolContext; events: RunEven
       emit: (e) => events.push(e),
       requestApproval: () => Promise.resolve(false),
       approvalsEnabled: false,
-      state: { activeChild: null, snapshots: [] },
+      state: { activeChild: null, snapshots: [], redo: [] },
     },
   }
 }
@@ -108,6 +108,28 @@ describe('vertical slice integration', () => {
       { type: 'file.changed', path: 'docs/new.md', op: 'write' },
       { type: 'file.changed', path: 'docs/new.md', op: 'delete' },
     ])
+  })
+
+  it('reviews mutations before applying them and detects intervening edits', async () => {
+    const registry = createDefaultRegistry()
+    const { ctx } = makeCtx('build')
+    const target = path.join(repo, 'docs', 'review.txt')
+
+    ctx.reviewChange = () => Promise.resolve(false)
+    await expect(registry.get('write_file')!.execute({ path: 'docs/review.txt', content: 'approved' }, ctx)).rejects.toThrow(
+      /rejected the change/,
+    )
+
+    ctx.reviewChange = () => {
+      writeFileSync(target, 'changed externally')
+      return Promise.resolve(true)
+    }
+    await expect(registry.get('write_file')!.execute({ path: 'docs/review.txt', content: 'approved' }, ctx)).rejects.toThrow(
+      /changed while it was being reviewed/,
+    )
+    expect(await import('node:fs/promises').then((fs) => fs.readFile(target, 'utf8'))).toBe('changed externally')
+
+    rmSync(target, { force: true })
   })
 
   it('runs a real command with streaming and captures exit codes', async () => {

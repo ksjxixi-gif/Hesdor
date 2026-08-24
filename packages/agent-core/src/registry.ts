@@ -12,6 +12,7 @@ import {
 import { searchFilesTool } from './tools/search.js'
 import { runCommandTool, stopCommandTool } from './tools/shell.js'
 import { gitDiffTool, gitLogTool, gitStatusTool } from './tools/git-tools.js'
+import { exploreTool } from './tools/explore.js'
 
 /** Typed tool registry. Duplicate names are a programming error. */
 export class ToolRegistry {
@@ -29,6 +30,15 @@ export class ToolRegistry {
 
   list(): AnyTool[] {
     return [...this.tools.values()]
+  }
+
+  /** Copy only read tools for nested investigation runs. */
+  readOnly(): ToolRegistry {
+    const registry = new ToolRegistry()
+    for (const tool of this.list()) {
+      if (tool.risk === 'READ') registry.register(tool)
+    }
+    return registry
   }
 
   /** Wire-format descriptions for the model provider. */
@@ -54,6 +64,7 @@ export function createDefaultRegistry(): ToolRegistry {
     .register(deleteFileTool)
     .register(runCommandTool)
     .register(stopCommandTool)
+    .register(exploreTool)
     .register(gitStatusTool)
     .register(gitDiffTool)
     .register(gitLogTool)

@@ -28,7 +28,12 @@ const TOOL_VERBS: Record<string, string> = {
   git_status: 'Status',
   git_diff: 'Diffing',
   git_log: 'History',
+  explore: 'Exploring',
 }
+
+const SUBAGENT_SYSTEM =
+  'You are Hesdor\'s exploratory subagent. Investigate the given task using ONLY read tools (list_files, search_files, read_file, read_files, git_status, git_log). ' +
+  'Answer the task precisely in your final message and nothing else. Keep the answer under 800 words. If you cannot answer, say so. You have no write or execute permissions.'
 
 /** "read_file src/auth.ts" -> "Reading src/auth.ts" */
 function prettySummary(summary: string): string {
@@ -113,7 +118,31 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
     // Headless runs either auto-approve (--yes) or are denied before this is called.
     requestApproval: () => Promise.resolve(flags.yes),
     approvalsEnabled: flags.yes,
-    state: { activeChild: null, snapshots: [] },
+    state: { activeChild: null, snapshots: [], redo: [] },
+    subagent: async (task, subMaxSteps = 5) => {
+      const subCtx: ToolContext = {
+        root,
+        mode: 'ask',
+        model: provider.model,
+        signal: controller.signal,
+        emit: () => {},
+        requestApproval: () => Promise.resolve(false),
+        approvalsEnabled: false,
+        state: { activeChild: null, snapshots: [], redo: [] },
+      }
+      const subResult = await runAgentLoop({
+        provider,
+        registry: registry.readOnly(),
+        ctx: subCtx,
+        systemPrompt: SUBAGENT_SYSTEM,
+        userPrompt: task,
+        history: [],
+        maxSteps: Math.min(subMaxSteps, 10),
+      })
+      const lastText =
+        [...subResult.messages].reverse().find((m) => m.role === 'assistant' && m.content.trim() !== '')?.content ?? ''
+      return lastText ? lastText.slice(0, 6000) : (subResult.error ?? 'subagent produced no answer')
+    },
   }
 
   try {

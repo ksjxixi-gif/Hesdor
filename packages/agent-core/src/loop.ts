@@ -66,6 +66,7 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
   const finish = (result: Omit<AgentResult, 'messages'>): AgentResult => ({ ...result, messages })
 
   let steps = 0
+  let usageTotal: { inputTokens?: number; outputTokens?: number; totalTokens?: number; ready?: boolean } | undefined
   ctx.emit({ type: 'run.started', mode: ctx.mode, model: provider.model })
 
   try {
@@ -85,8 +86,15 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
           if (chunk.name) acc.name = chunk.name
           acc.args += chunk.argumentsDelta
           pending.set(chunk.index, acc)
+        } else if (chunk.type === 'finish' && chunk.usage?.ready) {
+          usageTotal = {
+            totalTokens: (usageTotal?.totalTokens ?? 0) + (chunk.usage.totalTokens ?? 0),
+            inputTokens: (usageTotal?.inputTokens ?? 0) + (chunk.usage.inputTokens ?? 0),
+            outputTokens: (usageTotal?.outputTokens ?? 0) + (chunk.usage.outputTokens ?? 0),
+            ready: true,
+          }
         }
-        // 'finish' chunks carry no payload we need; loop ends when the stream does.
+        // Loop ends when the stream does.
       }
 
       const toolCalls: ToolCallRequest[] = [...pending.entries()]
@@ -105,8 +113,8 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
       ctx.emit({ type: 'assistant.message', content: text, toolCalls })
 
       if (toolCalls.length === 0) {
-        ctx.emit({ type: 'run.completed', steps })
-        return finish({ status: 'completed' })
+        ctx.emit({ type: 'run.completed', steps, ...(usageTotal ? { usage: usageTotal } : {}) })
+        return finish({ status: 'completed', ...(usageTotal ? { usage: usageTotal } : {}) })
       }
 
       for (const call of toolCalls) {
@@ -115,8 +123,8 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
       }
     }
 
-    ctx.emit({ type: 'run.completed', steps })
-    return finish({ status: 'max_steps' })
+    ctx.emit({ type: 'run.completed', steps, ...(usageTotal ? { usage: usageTotal } : {}) })
+    return finish({ status: 'max_steps', ...(usageTotal ? { usage: usageTotal } : {}) })
   } catch (err) {
     if (isAbortError(err)) {
       ctx.emit({ type: 'run.cancelled' })

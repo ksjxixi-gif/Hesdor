@@ -27,10 +27,11 @@ export function ListPicker({ title, items, loading, error, onPick, onClose }: Li
 
   const filtered = useMemo<PickerItem[]>(() => {
     const q = query.trim().toLowerCase()
-    const base =
-      q === '' ? items : items.filter((i) => i.label.toLowerCase().includes(q) || i.value.toLowerCase().includes(q))
-    return base.slice(0, VISIBLE)
+    return q === '' ? items : items.filter((i) => i.label.toLowerCase().includes(q) || i.value.toLowerCase().includes(q))
   }, [items, query])
+
+  const start = Math.min(Math.max(0, sel - VISIBLE + 1), Math.max(0, filtered.length - VISIBLE))
+  const visible = filtered.slice(start, start + VISIBLE)
 
   useEffect(() => {
     setSel((s) => Math.min(s, Math.max(0, filtered.length - 1)))
@@ -48,7 +49,12 @@ export function ListPicker({ title, items, loading, error, onPick, onClose }: Li
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
-      <Text bold>{title}</Text>
+      <Box justifyContent="space-between">
+        <Text bold color="cyan">
+          {title}
+        </Text>
+        {!loading && <Text dimColor>{filtered.length} match{filtered.length === 1 ? '' : 'es'}</Text>}
+      </Box>
       {loading ? (
         <Text dimColor>loading…</Text>
       ) : (
@@ -58,8 +64,9 @@ export function ListPicker({ title, items, loading, error, onPick, onClose }: Li
             <TextInput value={query} onChange={setQuery} placeholder="type to search…" />
           </Box>
           {error && <Text color="red">{error}</Text>}
-          {filtered.map((item, i) =>
-            i === sel ? (
+          {start > 0 && <Text dimColor>↑ more</Text>}
+          {visible.map((item, i) =>
+            i + start === sel ? (
               <Box key={item.value} columnGap={1}>
                 <Text color="cyan" bold>
                   › {item.label}
@@ -73,6 +80,7 @@ export function ListPicker({ title, items, loading, error, onPick, onClose }: Li
               </Box>
             ),
           )}
+          {start + visible.length < filtered.length && <Text dimColor>↓ more</Text>}
           {filtered.length === 0 && !error && <Text dimColor>no matches — esc to close</Text>}
         </>
       )}

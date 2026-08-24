@@ -22,6 +22,7 @@ export interface ParsedArgs {
     | 'init'
     | 'doctor'
     | 'setup'
+    | 'pricing'
     | 'model'
     | 'provider'
   /** For run/ask/plan: the prompt. For model/provider/setup: an optional value. */
@@ -40,6 +41,7 @@ Usage:
 
 Setup:
   hesdor setup                 Choose provider, store API key, set default model
+  hesdor pricing               Show Hesdor Cloud plans
   hesdor provider [<id>]       Show or set the default provider
   hesdor model [<id>]          Show or set the default model
   hesdor init                  Create HESDOR.md and .hesdorignore starters
@@ -48,8 +50,12 @@ Setup:
 Options:
   -p, --provider <name>        Provider preset (openai, anthropic, openrouter,
                                groq, deepseek, mistral, together, fireworks,
-                               xai, ollama, lmstudio, openai-compatible,
-                               anthropic-compatible)
+                               hesdor, xai, opencode-zen, opencode-go, gemini,
+                               cerebras, sambanova, perplexity,
+                               nvidia, huggingface, cohere, deepinfra, ollama,
+                               lmstudio,
+                               openai-compatible, anthropic-compatible, or any
+                               custom provider saved by \`hesdor setup\`
   -m, --model <model>          Model id for the provider
       --base-url <url>         Override the provider endpoint
       --mode <mode>            Interactive default mode: build | plan | ask
@@ -63,8 +69,13 @@ Options:
 Environment:
   OPENAI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY,
   DEEPSEEK_API_KEY, MISTRAL_API_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY,
-  XAI_API_KEY — or save keys once with \`hesdor setup\`. Keys are never stored
-  inside repositories.
+  XAI_API_KEY, OPENCODE_API_KEY, GEMINI_API_KEY, CEREBRAS_API_KEY,
+  SAMBANOVA_API_KEY,
+  PERPLEXITY_API_KEY, NVIDIA_API_KEY, HF_TOKEN, COHERE_API_KEY,
+  DEEPINFRA_TOKEN, OPENAI_COMPATIBLE_API_KEY, ANTHROPIC_COMPATIBLE_API_KEY,
+  HESDOR_API_KEY, HESDOR_BASE_URL, HESDOR_CUSTOM_API_KEY — or save keys once
+  with \`hesdor setup\`.
+  Keys are never stored inside repositories.
 
 Extensions (project .hesdor/ dir, global config dir):
   commands/<name>.md   custom slash commands; $ARGUMENTS in the template
@@ -96,6 +107,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case 'init':
       case 'doctor':
       case 'setup':
+      case 'pricing':
       case 'model':
       case 'provider':
         // Only the first keyword selects the command; later ones are prompt text

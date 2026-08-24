@@ -1,9 +1,13 @@
+export type ProviderKind = 'openai' | 'anthropic'
+
 export interface ProviderPreset {
   id: string
   label: string
-  kind: 'openai' | 'anthropic'
+  kind: ProviderKind
   /** Default endpoint; may be overridden per-call for self-hosted gateways. */
   baseUrl?: string
+  /** Environment variable for a service endpoint without a baked-in public URL. */
+  baseUrlEnvKey?: string
   /** Environment variable that holds the API key. */
   envKey?: string
   /** Local providers (Ollama, LM Studio) do not need a key. */
@@ -24,6 +28,15 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     envKey: 'OPENAI_API_KEY',
     requiresApiKey: true,
     defaultModel: 'gpt-4o-mini',
+  },
+  {
+    id: 'hesdor',
+    label: 'Hesdor Cloud',
+    kind: 'openai',
+    baseUrlEnvKey: 'HESDOR_BASE_URL',
+    envKey: 'HESDOR_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'auto',
   },
   {
     id: 'anthropic',
@@ -96,6 +109,96 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     envKey: 'XAI_API_KEY',
     requiresApiKey: true,
     defaultModel: 'grok-4-fast-non-reasoning',
+  },
+  {
+    id: 'opencode-zen',
+    label: 'OpenCode Zen',
+    kind: 'openai',
+    baseUrl: 'https://opencode.ai/zen/v1',
+    envKey: 'OPENCODE_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'deepseek-v4-flash',
+  },
+  {
+    id: 'opencode-go',
+    label: 'OpenCode Go',
+    kind: 'openai',
+    baseUrl: 'https://opencode.ai/zen/go/v1',
+    envKey: 'OPENCODE_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'deepseek-v4-flash',
+  },
+  {
+    id: 'gemini',
+    label: 'Google Gemini (OpenAI-compatible)',
+    kind: 'openai',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    envKey: 'GEMINI_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'gemini-2.5-flash',
+  },
+  {
+    id: 'cerebras',
+    label: 'Cerebras Inference',
+    kind: 'openai',
+    baseUrl: 'https://api.cerebras.ai/v1',
+    envKey: 'CEREBRAS_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'llama-3.3-70b',
+  },
+  {
+    id: 'sambanova',
+    label: 'SambaNova Cloud',
+    kind: 'openai',
+    baseUrl: 'https://api.sambanova.ai/v1',
+    envKey: 'SAMBANOVA_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'Meta-Llama-3.3-70B-Instruct',
+  },
+  {
+    id: 'perplexity',
+    label: 'Perplexity',
+    kind: 'openai',
+    baseUrl: 'https://api.perplexity.ai',
+    envKey: 'PERPLEXITY_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'sonar-pro',
+  },
+  {
+    id: 'nvidia',
+    label: 'NVIDIA NIM',
+    kind: 'openai',
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    envKey: 'NVIDIA_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'meta/llama-3.3-70b-instruct',
+  },
+  {
+    id: 'huggingface',
+    label: 'Hugging Face Inference',
+    kind: 'openai',
+    baseUrl: 'https://router.huggingface.co/v1',
+    envKey: 'HF_TOKEN',
+    requiresApiKey: true,
+    defaultModel: 'openai/gpt-oss-120b',
+  },
+  {
+    id: 'cohere',
+    label: 'Cohere Compatibility API',
+    kind: 'openai',
+    baseUrl: 'https://api.cohere.com/compatibility/v1',
+    envKey: 'COHERE_API_KEY',
+    requiresApiKey: true,
+    defaultModel: 'command-a-03-2025',
+  },
+  {
+    id: 'deepinfra',
+    label: 'DeepInfra',
+    kind: 'openai',
+    baseUrl: 'https://api.deepinfra.com/v1/openai',
+    envKey: 'DEEPINFRA_TOKEN',
+    requiresApiKey: true,
+    defaultModel: 'meta-llama/Meta-Llama-3.1-8B-Instruct',
   },
   {
     id: 'ollama',

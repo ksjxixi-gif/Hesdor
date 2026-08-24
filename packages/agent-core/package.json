@@ -4,6 +4,9 @@
   "type": "module",
   "description": "Hesdor agent runtime: tools, permissions, repository context, agent loop",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {

@@ -1,5 +1,6 @@
 import readline from 'node:readline/promises'
 import { PROVIDER_PRESETS, getPreset } from '@hesdor/providers'
+import type { ProviderKind, ProviderPreset } from '@hesdor/providers'
 import { saveCredential } from './auth.js'
 import { loadConfig, saveConfig } from './config.js'
 
@@ -10,7 +11,7 @@ const RESET = '\x1b[0m'
 /**
  * First-run wizard: pick a provider, store its key (never inside a repo),
  * set the default model. Interactive in a TTY; also accepts piped answers
- * (one per line: provider, [base-url], api-key, model).
+ * (one per line: provider, [custom-id, format, base-url], api-key, model).
  */
 export async function runSetup(): Promise<number> {
   const isTTY = process.stdin.isTTY === true
@@ -24,7 +25,7 @@ export async function runSetup(): Promise<number> {
       process.stdin.on('data', (chunk) => (buffer += chunk))
       process.stdin.on('end', () => resolve(buffer))
     })
-    scripted = raw.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== '')
+    scripted = raw.split(/\r?\n/).map((l) => l.trim())
   } else {
     rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   }
@@ -38,6 +39,20 @@ export async function runSetup(): Promise<number> {
     return answer
   }
 
+  const askSecret = async (question: string): Promise<string> => {
+    if (!rl) {
+      const answer = scripted[scriptIdx] ?? ''
+      scriptIdx++
+      console.log(`${question} [hidden]`)
+      return answer
+    }
+    rl.close()
+    rl = undefined
+    const answer = await readHiddenLine(question)
+    rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+    return answer.trim()
+  }
+
   try {
     console.log(`${BOLD}Hesdor setup${RESET}`)
     console.log('Pick an AI provider:\n')
@@ -47,30 +62,61 @@ export async function runSetup(): Promise<number> {
       const keyHint = p.requiresApiKey ? (p.envKey ? `uses ${p.envKey}` : '') : 'no key needed'
       console.log(`  ${String(i + 1).padStart(2)})  ${p.id.padEnd(22)} ${DIM}${p.label} · ${keyHint}${RESET}`)
     }
+    console.log(`  ${String(PROVIDER_PRESETS.length + 1).padStart(2)})  custom${' '.repeat(19)}${DIM}your own OpenAI- or Anthropic-compatible endpoint${RESET}`)
     console.log()
 
-    let presetId = ''
+    let providerId = ''
+    let preset: ProviderPreset | undefined
+    let customKind: ProviderKind | undefined
     for (;;) {
       const answer = (await ask('Number or provider id: ')).trim().toLowerCase()
       const byNumber = /^\d+$/.test(answer) ? PROVIDER_PRESETS[Number(answer) - 1]?.id : undefined
-      presetId = byNumber ?? answer
-      if (getPreset(presetId)) break
+      const isCustom = answer === 'custom' || answer === 'other' || Number(answer) === PROVIDER_PRESETS.length + 1
+      if (isCustom) {
+        for (;;) {
+          const customId = (await ask('Provider id (letters, numbers, ., _ or -): ')).trim().toLowerCase()
+          if (/^[a-z0-9][a-z0-9._-]{0,39}$/.test(customId) && !getPreset(customId) && customId !== 'custom') {
+            providerId = customId
+            break
+          }
+          console.log('Use a new provider id with 1-40 letters, numbers, dots, underscores or hyphens.')
+        }
+        for (;;) {
+          const format = (await ask('API format [openai]: ')).trim().toLowerCase() || 'openai'
+          if (format === 'openai' || format === 'openai-compatible') {
+            customKind = 'openai'
+            break
+          }
+          if (format === 'anthropic' || format === 'anthropic-compatible') {
+            customKind = 'anthropic'
+            break
+          }
+          console.log('Format must be openai or anthropic.')
+        }
+        break
+      }
+      providerId = byNumber ?? answer
+      preset = getPreset(providerId)
+      if (preset) break
       console.log('Not a valid provider — try again.')
     }
 
-    const preset = getPreset(presetId)!
     const cfg = await loadConfig()
 
     // Custom endpoints need a base URL before anything else.
-    let baseUrl = preset.baseUrl ?? cfg.baseUrls?.[presetId]
+    const envBaseUrl = preset?.baseUrlEnvKey ? process.env[preset.baseUrlEnvKey] : undefined
+    let baseUrl = customKind ? undefined : preset?.baseUrl ?? cfg.baseUrls?.[providerId] ?? envBaseUrl
     if (!baseUrl) {
       for (;;) {
-        const answer = (
-          await ask(`Base URL for ${preset.label} (e.g. https://your-endpoint/v1): `)
-        ).trim()
-        if (/^https?:\/\//i.test(answer)) {
+        const example = customKind === 'anthropic' ? 'https://your-endpoint' : 'https://your-endpoint/v1'
+        const answer = (await ask(`Base URL for ${preset?.label ?? providerId} (e.g. ${example}): `)).trim()
+        if (isHttpUrl(answer)) {
           baseUrl = answer
-          await saveConfig({ baseUrls: { ...cfg.baseUrls, [presetId]: answer } })
+          if (customKind) {
+            await saveConfig({ customProviders: { ...cfg.customProviders, [providerId]: { kind: customKind, baseUrl: answer } } })
+          } else {
+            await saveConfig({ baseUrls: { ...cfg.baseUrls, [providerId]: answer } })
+          }
           console.log('✓ endpoint saved')
           break
         }
@@ -78,29 +124,30 @@ export async function runSetup(): Promise<number> {
       }
     }
 
-    const envValue = preset.envKey ? process.env[preset.envKey] : undefined
-    if (preset.requiresApiKey && preset.envKey && envValue) {
-      console.log(`✓ ${preset.envKey} already set in your environment — using it.`)
+    const envKey = preset?.envKey ?? (customKind ? 'HESDOR_CUSTOM_API_KEY' : undefined)
+    const envValue = envKey ? process.env[envKey] : undefined
+    if (envValue) {
+      console.log(`✓ ${envKey} already set in your environment — using it.`)
     } else {
-      const required = preset.requiresApiKey
+      const required = preset?.requiresApiKey ?? false
       const hint = required ? 'REQUIRED' : 'optional — leave empty if your endpoint needs none'
-      const key = (await ask(`API key (${hint}): `))
+      const key = await askSecret(`API key (${hint}): `)
       if (key === '' && required) {
         console.log('No key entered. Re-run `hesdor setup` later.')
         return 1
       }
       if (key !== '') {
-        await saveCredential(presetId, key)
+        await saveCredential(providerId, key)
         console.log('✓ key saved to your global Hesdor profile')
       }
     }
 
-    const keepModel = cfg.provider === presetId ? cfg.model : undefined
-    const defaultModel = keepModel ?? preset.defaultModel
+    const keepModel = cfg.provider === providerId ? cfg.model : undefined
+    const defaultModel = keepModel ?? preset?.defaultModel ?? 'local-model'
     const model = (await ask(`Default model [${defaultModel}]: `)) || defaultModel
 
-    await saveConfig({ provider: presetId, model })
-    console.log(`\n✓ provider: ${presetId}`)
+    await saveConfig({ provider: providerId, model })
+    console.log(`\n✓ provider: ${providerId}`)
     console.log(`✓ model: ${model}`)
     console.log('\nNext steps:')
     console.log('  cd some-git-project')
@@ -112,21 +159,70 @@ export async function runSetup(): Promise<number> {
   }
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      url.hostname !== '' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.search === '' &&
+      url.hash === ''
+    )
+  } catch {
+    return false
+  }
+}
+
+function readHiddenLine(question: string): Promise<string> {
+  const input = process.stdin
+  if (!input.setRawMode) return new Promise((resolve) => resolve(''))
+
+  process.stdout.write(question)
+  const wasRaw = input.isRaw ?? false
+  input.setRawMode(true)
+  input.resume()
+
+  return new Promise((resolve) => {
+    let value = ''
+    const finish = (): void => {
+      input.off('data', onData)
+      input.setRawMode?.(wasRaw)
+      process.stdout.write('\n')
+      resolve(value)
+    }
+    const onData = (chunk: Buffer | string): void => {
+      for (const char of chunk.toString()) {
+        if (char === '\r' || char === '\n' || char === '\u0004' || char === '\u0003') {
+          finish()
+          return
+        }
+        if (char === '\u007f' || char === '\b') value = value.slice(0, -1)
+        else value += char
+      }
+    }
+    input.on('data', onData)
+  })
+}
+
 /** `hesdor provider [<id>]` — show or persist the default provider. */
 export async function runProviderCommand(value: string): Promise<number> {
-  if (value === '') {
+  const providerId = value.trim().toLowerCase()
+  if (providerId === '') {
     const cfg = await loadConfig()
     console.log(
       cfg.provider ?? 'no default provider set (auto-detects from available keys)',
     )
     return 0
   }
-  if (!getPreset(value)) {
-    console.error(`✗ unknown provider "${value}". Known: ${PROVIDER_PRESETS.map((p) => p.id).join(', ')}`)
+  const cfg = await loadConfig()
+  if (!getPreset(providerId) && !cfg.customProviders?.[providerId]) {
+    console.error(`✗ unknown provider "${providerId}". Run \`hesdor setup\` to add a custom endpoint.`)
     return 1
   }
-  await saveConfig({ provider: value })
-  console.log(`✓ default provider set to ${value}`)
+  await saveConfig({ provider: providerId })
+  console.log(`✓ default provider set to ${providerId}`)
   return 0
 }
 

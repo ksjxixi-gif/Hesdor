@@ -125,6 +125,6 @@ function brokenCtx(): ToolContext {
     emit: () => {},
     requestApproval: () => Promise.resolve(true),
     approvalsEnabled: true,
-    state: { activeChild: null, snapshots: [] },
+    state: { activeChild: null, snapshots: [], redo: [] },
   }
 }

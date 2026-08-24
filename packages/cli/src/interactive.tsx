@@ -21,6 +21,7 @@ export async function startInteractive(flags: CliFlags, initialPrompt?: string):
 
   let providerId: string
   let model: string
+  let baseUrl: string | undefined
   let keySource: string
   try {
     const cfg = await loadConfig()
@@ -30,6 +31,7 @@ export async function startInteractive(flags: CliFlags, initialPrompt?: string):
     }
     providerId = sel.providerId
     model = sel.model
+    baseUrl = sel.baseUrl
     keySource = sel.keySource
   } catch (err) {
     console.error(`✗ ${err instanceof Error ? err.message : String(err)}`)
@@ -47,6 +49,7 @@ export async function startInteractive(flags: CliFlags, initialPrompt?: string):
       initialModel={model}
       session={session}
       initialPrompt={initialPrompt}
+      initialBaseUrl={baseUrl}
       keySource={keySource}
     />,
     { exitOnCtrlC: false },

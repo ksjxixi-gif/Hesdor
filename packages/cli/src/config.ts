@@ -1,6 +1,12 @@
 import os from 'node:os'
 import path from 'node:path'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import type { ProviderKind } from '@hesdor/providers'
+
+export interface CustomProviderConfig {
+  kind: ProviderKind
+  baseUrl: string
+}
 
 export interface HesdorConfig {
   /** Default provider preset id. */
@@ -9,11 +15,13 @@ export interface HesdorConfig {
   model?: string
   /** Saved endpoints for custom (openai/anthropic-compatible) providers. */
   baseUrls?: Record<string, string>
+  /** User-defined providers created by `hesdor setup`. */
+  customProviders?: Record<string, CustomProviderConfig>
 }
 
 /**
- * Global config location. API keys deliberately do NOT live here —
- * they come from the environment only.
+ * Global config location. API keys deliberately do NOT live in config.json;
+ * setup stores them separately in auth.json or they come from the environment.
  */
 export function configDir(): string {
   if (process.platform === 'win32') {

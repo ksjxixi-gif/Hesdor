@@ -1,4 +1,4 @@
-import type { ChatMessage, StreamChunk, ToolSpec } from '@hesdor/protocol'
+import type { ChatMessage, StreamChunk, ToolSpec, Usage } from '@hesdor/protocol'
 import { httpError, joinUrl, ProviderError } from './provider.js'
 import type { ModelProvider } from './provider.js'
 import { sseData } from './sse.js'
@@ -11,6 +11,8 @@ export interface OpenAICompatibleConfig {
   headers?: Record<string, string>
   /** Output token ceiling sent as max_tokens. Keeps gateways like OpenRouter from reserving the whole context. */
   maxTokens?: number
+  /** Local gateways may reject the OpenAI usage extension. */
+  includeUsage?: boolean
 }
 
 interface WireDelta {
@@ -27,6 +29,7 @@ interface WireChoice {
 }
 interface WireChunk {
   choices?: WireChoice[]
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
   error?: { message?: string }
 }
 
@@ -55,6 +58,7 @@ export class OpenAICompatibleProvider implements ModelProvider {
       stream: true,
       max_tokens: this.config.maxTokens ?? 8192,
     }
+    if (this.config.includeUsage !== false) body.stream_options = { include_usage: true }
     if (tools.length > 0) {
       body.tools = tools.map((t) => ({
         type: 'function',
@@ -88,6 +92,9 @@ export class OpenAICompatibleProvider implements ModelProvider {
     // Accumulate streamed tool call fragments by index.
     const calls = new Map<number, { id?: string; name?: string; args: string }>()
 
+    let lastUsage: Usage | undefined
+    let finishReason: string | undefined
+
     for await (const data of sseData(res)) {
       if (!data || data === '[DONE]') continue
       let evt: WireChunk
@@ -97,6 +104,14 @@ export class OpenAICompatibleProvider implements ModelProvider {
         continue
       }
       if (evt.error?.message) throw new ProviderError(evt.error.message)
+      if (evt.usage?.prompt_tokens !== undefined || evt.usage?.total_tokens !== undefined) {
+        lastUsage = {
+          inputTokens: evt.usage.prompt_tokens,
+          outputTokens: evt.usage.completion_tokens,
+          totalTokens: evt.usage.total_tokens,
+          ready: true,
+        }
+      }
       const choice = evt.choices?.[0]
       if (!choice) continue
 
@@ -121,7 +136,15 @@ export class OpenAICompatibleProvider implements ModelProvider {
         }
       }
       if (choice.finish_reason) {
-        yield { type: 'finish', reason: choice.finish_reason === 'tool_calls' ? 'tool_calls' : 'stop' }
+        finishReason = choice.finish_reason
+      }
+    }
+
+    if (finishReason) {
+      yield {
+        type: 'finish',
+        reason: finishReason === 'tool_calls' ? 'tool_calls' : 'stop',
+        ...(lastUsage ? { usage: lastUsage } : {}),
       }
     }
   }

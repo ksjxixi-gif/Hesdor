@@ -1,9 +1,15 @@
 {
-  "name": "@hesdor/cli",
+  "name": "hesdor",
   "version": "0.1.0",
   "type": "module",
   "description": "Hesdor terminal UI and CLI entrypoint",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "bin": {
     "hesdor": "./bin/hesdor.js"
   },

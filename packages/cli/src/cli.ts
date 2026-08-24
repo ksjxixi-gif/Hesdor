@@ -4,6 +4,7 @@ import { printInitResult, runInit } from './init.js'
 import { runHeadless } from './headless.js'
 import { startInteractive } from './interactive.js'
 import { runModelCommand, runProviderCommand, runSetup } from './setup.js'
+import { runPricing } from './pricing.js'
 
 export { VERSION }
 
@@ -35,6 +36,9 @@ async function main(): Promise<void> {
       return
     case 'setup':
       process.exitCode = await runSetup()
+      return
+    case 'pricing':
+      process.exitCode = runPricing()
       return
     case 'model':
       process.exitCode = await runModelCommand(parsed.prompt)

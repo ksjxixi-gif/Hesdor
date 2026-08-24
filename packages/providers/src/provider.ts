@@ -29,5 +29,6 @@ export async function httpError(res: Response): Promise<ProviderError> {
 /** Join a base URL and path, tolerating a trailing slash on either side. */
 export function joinUrl(base: string, path: string): string {
   const trimmed = base.endsWith('/') ? base.slice(0, -1) : base
-  return `${trimmed}${path}`
+  const suffix = trimmed.endsWith('/v1') && path.startsWith('/v1/') ? path.slice(3) : path
+  return `${trimmed}${suffix}`
 }

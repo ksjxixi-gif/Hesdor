@@ -34,11 +34,19 @@ export interface ToolSpec {
   parametersJsonSchema: Record<string, unknown>
 }
 
+/** Token accounting reported by providers, best-effort. */
+export interface Usage {
+  inputTokens?: number
+  outputTokens?: number
+  totalTokens?: number
+  ready?: boolean
+}
+
 /** Incremental chunk streamed from a model provider. */
 export type StreamChunk =
   | { type: 'text'; text: string }
   | { type: 'tool_call'; index: number; id?: string; name?: string; argumentsDelta: string }
-  | { type: 'finish'; reason: string }
+  | { type: 'finish'; reason: string; usage?: Usage }
 
 /**
  * Event protocol. The agent core emits these; every UI consumes them and the
@@ -54,7 +62,7 @@ export type RunEvent =
   | { type: 'tool.failed'; callId: string; name: string; error: string }
   | { type: 'file.changed'; path: string; op: 'write' | 'delete' }
   | { type: 'command.output'; stream: 'stdout' | 'stderr'; line: string }
-  | { type: 'run.completed'; steps: number }
+  | { type: 'run.completed'; steps: number; usage?: Usage }
   | { type: 'run.failed'; error: string }
   | { type: 'run.cancelled' }
 
@@ -62,6 +70,7 @@ export type RunEvent =
 export interface AgentResult {
   status: 'completed' | 'max_steps' | 'cancelled' | 'failed'
   messages: ChatMessage[]
+  usage?: Usage
   error?: string
 }
 

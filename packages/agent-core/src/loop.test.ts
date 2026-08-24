@@ -35,7 +35,7 @@ function testCtx(root: string, mode: ToolContext['mode'], opts?: { approvals?: b
       emit: (event) => events.push(event),
       requestApproval: () => Promise.resolve(opts?.approvals ?? false),
       approvalsEnabled: opts?.approvals ?? false,
-      state: { activeChild: null, snapshots: [] },
+      state: { activeChild: null, snapshots: [], redo: [] },
     },
   }
 }
@@ -199,6 +199,29 @@ describe('plugin hooks', () => {
     // Event hooks observed the whole lifecycle.
     expect(seen).toContain('run.started')
     expect(seen).toContain('tool.failed')
+  })
+})
+
+describe('explore subagent hook', () => {
+  it('delegates to ctx.subagent and returns its synthesis', async () => {
+    const root = process.cwd()
+    const provider = new ScriptedProvider([
+      toolCallChunks('x1', 'explore', '{"task":"trace auth flows"}'),
+      [{ type: 'text', text: 'done investigating' }, { type: 'finish', reason: 'stop' }],
+    ])
+    const { ctx } = testCtx(root, 'ask')
+    ctx.subagent = (task, maxSteps) => Promise.resolve(`sub=(${task},${maxSteps})`)
+
+    const result = await runAgentLoop({
+      provider,
+      registry: createDefaultRegistry(),
+      ctx,
+      systemPrompt: '',
+      userPrompt: 'delegate',
+    })
+
+    const toolResult = result.messages.find((m) => m.role === 'tool_result')
+    expect(toolResult?.content).toContain('sub=(trace auth flows,5)')
   })
 })
 

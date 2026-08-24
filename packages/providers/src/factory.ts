@@ -4,7 +4,8 @@ import { OpenAICompatibleProvider } from './openai-compatible.js'
 import type { OpenAICompatibleConfig } from './openai-compatible.js'
 import type { ModelProvider, ProviderError as _PE } from './provider.js'
 import { joinUrl } from './provider.js'
-import { getPreset } from './presets.js'
+import { getPreset, PROVIDER_PRESETS } from './presets.js'
+import type { ProviderKind } from './presets.js'
 
 export interface CreateProviderOptions {
   /** Preset id (see PROVIDER_PRESETS) — e.g. openai, anthropic, openrouter, ollama. */
@@ -12,6 +13,8 @@ export interface CreateProviderOptions {
   model?: string
   /** Override the endpoint (self-hosted or custom gateway). */
   baseUrl?: string
+  /** Wire format for an unknown provider id. Defaults to OpenAI-compatible in the CLI. */
+  customKind?: ProviderKind
   /** Overrides the environment variable when set. */
   apiKey?: string
   /** Output token ceiling (default 8192). */
@@ -20,7 +23,7 @@ export interface CreateProviderOptions {
 
 export class UnknownProviderError extends Error {
   constructor(id: string) {
-    const known = ['openai', 'anthropic', 'openrouter', 'groq', 'deepseek', 'mistral', 'together', 'fireworks', 'xai', 'ollama', 'lmstudio', 'openai-compatible', 'anthropic-compatible']
+    const known = PROVIDER_PRESETS.map((p) => p.id)
     super(`unknown provider "${id}". Known providers: ${known.join(', ')}`)
     this.name = 'UnknownProviderError'
   }
@@ -29,39 +32,43 @@ export class UnknownProviderError extends Error {
 /** Build a ModelProvider from a preset id plus optional overrides. */
 export function createProvider(opts: CreateProviderOptions): ModelProvider {
   const preset = getPreset(opts.provider)
-  if (!preset) throw new UnknownProviderError(opts.provider)
+  if (!preset && !opts.customKind) throw new UnknownProviderError(opts.provider)
 
-  const model = opts.model || preset.defaultModel
-  const apiKey = opts.apiKey ?? (preset.envKey ? process.env[preset.envKey] : undefined)
+  const kind = preset?.kind ?? opts.customKind!
+  const model = opts.model || preset?.defaultModel || 'local-model'
+  const apiKey = opts.apiKey ?? (preset?.envKey ? process.env[preset.envKey] : undefined)
 
-  if (preset.requiresApiKey && !apiKey) {
+  if (preset?.requiresApiKey && !apiKey) {
     throw new Error(
       `provider "${preset.id}" needs an API key. Set ${preset.envKey} in your environment ` +
         `or run \`hesdor doctor\` to inspect the current setup.`,
     )
   }
 
-  if (preset.kind === 'anthropic') {
+  const baseUrl = opts.baseUrl ?? preset?.baseUrl
+  if (!baseUrl) {
+    throw new Error(`provider "${opts.provider}" requires a base URL (use --base-url)`)
+  }
+
+  if (kind === 'anthropic') {
     const config: AnthropicConfig = {
       apiKey: apiKey ?? '',
       model,
       ...(opts.maxTokens ? { maxTokens: opts.maxTokens } : {}),
-      ...(opts.baseUrl ? { baseUrl: opts.baseUrl } : preset.baseUrl ? { baseUrl: preset.baseUrl } : {}),
+      baseUrl,
     }
     return new AnthropicProvider(config)
   }
 
-  const baseUrl = opts.baseUrl ?? preset.baseUrl
-  if (!baseUrl) {
-    throw new Error(`provider "${preset.id}" requires a base URL (use --base-url)`)
-  }
   const config: OpenAICompatibleConfig = {
-    name: preset.id,
+    name: preset?.id ?? opts.provider,
     baseUrl,
     model,
     ...(apiKey ? { apiKey } : {}),
     ...(opts.maxTokens ? { maxTokens: opts.maxTokens } : {}),
-    ...extraHeaders(preset.id),
+    // Unknown gateways vary in how strictly they validate request fields.
+    includeUsage: preset ? preset.id !== 'ollama' && preset.id !== 'lmstudio' : false,
+    ...extraHeaders(preset?.id ?? opts.provider),
   }
   return new OpenAICompatibleProvider(config)
 }
@@ -83,17 +90,19 @@ export async function fetchModels(opts: {
   provider: string
   baseUrl?: string
   apiKey?: string
+  customKind?: ProviderKind
 }): Promise<string[]> {
   const preset = getPreset(opts.provider)
-  if (!preset) throw new Error(`unknown provider "${opts.provider}"`)
+  if (!preset && !opts.customKind) throw new Error(`unknown provider "${opts.provider}"`)
 
-  const base = opts.baseUrl ?? preset.baseUrl
+  const kind = preset?.kind ?? opts.customKind!
+  const base = opts.baseUrl ?? preset?.baseUrl
   if (!base) throw new Error(`provider "${opts.provider}" requires a base URL`)
 
-  const path = preset.kind === 'anthropic' ? '/v1/models' : '/models'
+  const path = kind === 'anthropic' ? '/v1/models' : '/models'
   const headers: Record<string, string> = {}
-  const key = opts.apiKey ?? (preset.envKey ? process.env[preset.envKey] : undefined)
-  if (preset.kind === 'anthropic') {
+  const key = opts.apiKey ?? (preset?.envKey ? process.env[preset.envKey] : undefined)
+  if (kind === 'anthropic') {
     headers['x-api-key'] = key ?? ''
     headers['anthropic-version'] = '2023-06-01'
   } else if (key) {

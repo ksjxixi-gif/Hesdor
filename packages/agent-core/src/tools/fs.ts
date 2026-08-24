@@ -3,6 +3,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { safeResolve, toRel } from '../paths.js'
 import { GitIgnoreMatcher } from '../ignore.js'
+import { PermissionDeniedError } from '../policy.js'
 import type { ToolContext } from '../context.js'
 import { defineTool } from './types.js'
 
@@ -18,16 +19,39 @@ function cleanOptional(value: string | undefined): string | undefined {
 
 const MAX_SNAPSHOTS = 50
 
-/** Capture prior file content so /undo can restore it after a successful write. */
-async function capturePreState(ctx: ToolContext, abs: string): Promise<void> {
-  let content: string | null = null
+/** Prior file content, or null when the file does not exist. */
+async function readBefore(abs: string): Promise<string | null> {
   try {
-    content = await readFile(abs, 'utf8')
-  } catch {
-    // did not exist
+    return await readFile(abs, 'utf8')
+  } catch (err) {
+    if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT') return null
+    throw err
   }
-  ctx.state.snapshots.push({ path: abs, content })
+}
+
+/** Capture prior content post-approval so /undo can restore it. */
+function pushSnapshot(ctx: ToolContext, abs: string, before: string | null): void {
+  ctx.state.redo.length = 0
+  ctx.state.snapshots.push({ path: abs, content: before })
   if (ctx.state.snapshots.length > MAX_SNAPSHOTS) ctx.state.snapshots.shift()
+}
+
+/** Host review gate for file mutations; throws when the user rejects. */
+async function requireApproved(
+  ctx: ToolContext,
+  abs: string,
+  relPath: string,
+  before: string | null,
+  after: string | null,
+): Promise<void> {
+  if (!ctx.reviewChange) return
+  const approved = await ctx.reviewChange({ path: relPath, before, after })
+  if (!approved) {
+    throw new PermissionDeniedError(`the user rejected the change to ${relPath}`)
+  }
+  if ((await readBefore(abs)) !== before) {
+    throw new Error(`the file changed while it was being reviewed: ${relPath}`)
+  }
 }
 
 export const listFilesTool = defineTool({
@@ -157,9 +181,11 @@ export const writeFileTool = defineTool({
   }),
   async execute(input, ctx: ToolContext) {
     const abs = safeResolve(ctx.root, input.path)
-    await capturePreState(ctx, abs)
+    const before = await readBefore(abs)
+    await requireApproved(ctx, abs, toRel(ctx.root, abs), before, input.content)
     await mkdir(path.dirname(abs), { recursive: true })
     await writeFile(abs, input.content, 'utf8')
+    pushSnapshot(ctx, abs, before)
     ctx.emit({ type: 'file.changed', path: toRel(ctx.root, abs), op: 'write' })
     return { path: toRel(ctx.root, abs), bytes: Buffer.byteLength(input.content, 'utf8') }
   },
@@ -172,8 +198,11 @@ export const deleteFileTool = defineTool({
   schema: z.object({ path: pathSchema }),
   async execute(input, ctx) {
     const abs = safeResolve(ctx.root, input.path)
-    await capturePreState(ctx, abs)
+    const before = await readBefore(abs)
+    if (before === null) throw new Error(`"${input.path}" does not exist`)
+    await requireApproved(ctx, abs, toRel(ctx.root, abs), before, null)
     await unlink(abs)
+    pushSnapshot(ctx, abs, before)
     ctx.emit({ type: 'file.changed', path: toRel(ctx.root, abs), op: 'delete' })
     return { deleted: true, path: toRel(ctx.root, abs) }
   },
@@ -199,7 +228,6 @@ export const applyPatchTool = defineTool({
   }),
   async execute(input, ctx) {
     const abs = safeResolve(ctx.root, input.path)
-    await capturePreState(ctx, abs)
     const original = await readFile(abs, 'utf8')
     let updated = original
     for (const edit of input.edits) {
@@ -216,7 +244,9 @@ export const applyPatchTool = defineTool({
         ? updated.split(edit.find).join(edit.replace)
         : updated.replace(edit.find, edit.replace)
     }
+    await requireApproved(ctx, abs, toRel(ctx.root, abs), original, updated)
     await writeFile(abs, updated, 'utf8')
+    pushSnapshot(ctx, abs, original)
     ctx.emit({ type: 'file.changed', path: toRel(ctx.root, abs), op: 'write' })
     return { path: toRel(ctx.root, abs), applied: input.edits.length }
   },

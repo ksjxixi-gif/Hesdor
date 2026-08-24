@@ -2,7 +2,7 @@
 
 Open-source, **local-first** AI software engineering CLI. Point it at a Git repository, give it a task, and Hesdor inspects code, edits files, runs commands and iterates until things work — using your choice of AI provider.
 
-No cloud service. No accounts, billing, telemetry or hosted sandboxes. Your code stays on your machine; prompts go straight to the model provider you configure.
+No hosted code execution or telemetry. Your code stays on your machine; prompts go to the model provider you configure, including optional Hesdor Cloud access.
 
 ## Install
 
@@ -11,7 +11,10 @@ Requires Node.js 22+.
 ```bash
 git clone https://github.com/hesdor/hesdor && cd hesdor
 pnpm install && pnpm build
-cd packages/cli && npm link   # puts `hesdor` on your PATH
+pnpm --filter hesdor link --global
+
+# Or install the published CLI (after the Hesdor packages are published):
+npm i -g hesdor
 ```
 
 ## Quick start
@@ -28,6 +31,10 @@ hesdor plan "Add rate limiting"             # read-only implementation plan
 hesdor run "Fix the failing test"           # full agent: read + edit + execute
 hesdor                                      # interactive TUI
 ```
+
+To publish a release from this monorepo, run `pnpm build` and publish the workspace
+packages with `pnpm -r publish --access public`. After that, users can install the
+CLI with `npm i -g hesdor`.
 
 ## Commands
 
@@ -50,7 +57,7 @@ Filesystem tools are sandboxed to the repository root — traversal attempts (`.
 
 Any OpenAI-compatible endpoint works out of the box:
 
-`openai` · `openrouter` · `groq` · `deepseek` · `mistral` · `together` · `fireworks` · `xai` · `ollama` (local) · `lmstudio` (local) · `openai-compatible` (custom base URL)
+`hesdor` (Hesdor Cloud) · `openai` · `openrouter` · `groq` · `deepseek` · `mistral` · `together` · `fireworks` · `xai` · `opencode-zen` · `opencode-go` · `gemini` · `cerebras` · `sambanova` · `perplexity` · `nvidia` · `huggingface` · `cohere` · `deepinfra` · `ollama` (local) · `lmstudio` (local) · `openai-compatible` (custom base URL)
 
 Plus native Anthropic (`anthropic`) and `anthropic-compatible` gateways.
 
@@ -58,9 +65,14 @@ Plus native Anthropic (`anthropic`) and `anthropic-compatible` gateways.
 hesdor -p openrouter -m anthropic/claude-sonnet-4.5
 hesdor -p ollama -m qwen2.5-coder:7b            # fully local
 hesdor -p openai-compatible --base-url http://localhost:8080/v1
+HESDOR_CUSTOM_API_KEY=... hesdor -p my-gateway --base-url https://example.com/v1
 ```
 
-Defaults persist in the global config (`hesdor config`: `%APPDATA%\hesdor\config.json` or `~/.config/hesdor/config.json`). API keys are read from environment variables only — never stored in files.
+Run `hesdor setup` to save a preset or your own endpoint, format, model and API key in the user profile. Defaults persist in `%APPDATA%\hesdor\config.json` or `~/.config/hesdor/config.json`; credentials are kept separately in the profile and never inside a repository.
+
+For an unknown endpoint, choose `custom` in setup and select `openai` or `anthropic` compatibility. For a one-off OpenAI-compatible endpoint, pass `-p <name> --base-url <url>` and set `HESDOR_CUSTOM_API_KEY` if it needs authentication. Custom Anthropic endpoints should use an API root such as `https://gateway.example.com`; Hesdor adds `/v1/messages`.
+
+Hesdor Cloud pricing is available with `hesdor pricing`: Free ($0, hard limit), Starter ($5/month), Pro ($7/month), and Max ($10/month). Account billing and quota enforcement belong to the Hesdor API service, not the local CLI.
 
 ## Project context
 

@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { createDefaultRegistry, undoLastChange } from './index.js'
+import { createDefaultRegistry, redoLastChange, undoLastChange } from './index.js'
 import type { RunEvent, ToolContext } from '@hesdor/protocol'
 
 function makeCtx(root: string): { ctx: ToolContext; events: RunEvent[] } {
@@ -17,7 +17,7 @@ function makeCtx(root: string): { ctx: ToolContext; events: RunEvent[] } {
       emit: (e) => events.push(e),
       requestApproval: () => Promise.resolve(true),
       approvalsEnabled: true,
-      state: { activeChild: null, snapshots: [] },
+      state: { activeChild: null, snapshots: [], redo: [] },
     },
   }
 }
@@ -57,5 +57,41 @@ describe('undoLastChange', () => {
   it('reports nothing-to-undo on an empty stack', async () => {
     const { ctx } = makeCtx(mkdtempSync(path.join(tmpdir(), 'hesdor-undo3-')))
     expect((await undoLastChange(ctx)).undone).toBe(false)
+  })
+
+  it('redo re-applies an undone change in both directions', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'hesdor-redo-'))
+    const registry = createDefaultRegistry()
+    const { ctx } = makeCtx(root)
+    const { readFile } = await import('node:fs/promises')
+
+    await registry.get('write_file')!.execute({ path: 'a.txt', content: 'v1\n' }, ctx)
+    await registry.get('write_file')!.execute({ path: 'a.txt', content: 'v2\n' }, ctx)
+
+    await undoLastChange(ctx)
+    expect(await readFile(path.join(root, 'a.txt'), 'utf8')).toBe('v1\n')
+
+    const redone = await redoLastChange(ctx)
+    expect(redone.redone).toBe(true)
+    expect(await readFile(path.join(root, 'a.txt'), 'utf8')).toBe('v2\n')
+
+    // redo it again: nothing left
+    expect((await redoLastChange(ctx)).redone).toBe(false)
+    // and the restored v2 state is undoable again
+    expect((await undoLastChange(ctx)).undone).toBe(true)
+    expect(await readFile(path.join(root, 'a.txt'), 'utf8')).toBe('v1\n')
+  })
+
+  it('clears redo history after a new mutation', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'hesdor-redo-clear-'))
+    const registry = createDefaultRegistry()
+    const { ctx } = makeCtx(root)
+
+    await registry.get('write_file')!.execute({ path: 'a.txt', content: 'v1' }, ctx)
+    await registry.get('write_file')!.execute({ path: 'a.txt', content: 'v2' }, ctx)
+    await undoLastChange(ctx)
+    await registry.get('write_file')!.execute({ path: 'a.txt', content: 'v3' }, ctx)
+
+    expect((await redoLastChange(ctx)).redone).toBe(false)
   })
 })

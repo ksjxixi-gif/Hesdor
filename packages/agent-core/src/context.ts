@@ -26,7 +26,19 @@ export interface ToolContext {
   requestApproval(req: ApprovalRequest): Promise<boolean>
   /** Host-level switch: when false, requestApproval is never consulted and risky actions are denied. */
   approvalsEnabled: boolean
-  state: { activeChild: ChildProcess | null; snapshots: FileSnapshot[] }
+  /** Optional nested agent hook powering the explore tool. */
+  subagent?: (task: string, maxSteps?: number) => Promise<string>
+  /**
+   * Optional pre-apply review gate for file mutations. Receives the path plus
+   * before/after content (null = absent). Resolve false to reject the change.
+   */
+  reviewChange?: (req: { path: string; before: string | null; after: string | null }) => Promise<boolean>
+  state: {
+    activeChild: ChildProcess | null
+    snapshots: FileSnapshot[]
+    /** States pushed when undoing, so /redo can restore them. */
+    redo: FileSnapshot[]
+  }
 }
 
 export interface RepoContextInfo {

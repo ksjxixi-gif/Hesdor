@@ -1,4 +1,4 @@
-import type { ChatMessage, StreamChunk, ToolSpec } from '@hesdor/protocol'
+import type { ChatMessage, StreamChunk, ToolSpec, Usage } from '@hesdor/protocol'
 import { httpError, joinUrl, ProviderError } from './provider.js'
 import type { ModelProvider } from './provider.js'
 import { sseData } from './sse.js'
@@ -26,6 +26,8 @@ interface StreamEvent {
   index?: number
   content_block?: { type?: string; id?: string; name?: string }
   delta?: { type?: string; text?: string; partial_json?: string; stop_reason?: string }
+  message?: { usage?: { input_tokens?: number } }
+  usage?: { output_tokens?: number }
   error?: { message?: string }
 }
 
@@ -127,6 +129,8 @@ export class AnthropicProvider implements ModelProvider {
     const blockKinds = new Map<number, 'text' | 'tool'>()
     const toolIndexOfBlock = new Map<number, number>()
     let nextToolIndex = 0
+    let inputTokens: number | undefined
+    let outputTokens: number | undefined
 
     for await (const data of sseData(res)) {
       if (!data) continue
@@ -137,6 +141,9 @@ export class AnthropicProvider implements ModelProvider {
         continue
       }
       switch (evt.type) {
+        case 'message_start':
+          inputTokens = evt.message?.usage?.input_tokens ?? inputTokens
+          break
         case 'content_block_start': {
           const idx = evt.index ?? 0
           if (evt.content_block?.type === 'tool_use') {
@@ -170,14 +177,25 @@ export class AnthropicProvider implements ModelProvider {
           }
           break
         }
-        case 'message_delta': {
-          if (evt.delta?.stop_reason === 'tool_use') {
-            yield { type: 'finish', reason: 'tool_calls' }
-          } else if (evt.delta?.stop_reason) {
-            yield { type: 'finish', reason: 'stop' }
+        case 'message_delta':
+          outputTokens = evt.usage?.output_tokens ?? outputTokens
+          if (evt.delta?.stop_reason) {
+            const usage: Usage | undefined =
+              inputTokens !== undefined || outputTokens !== undefined
+                ? {
+                    inputTokens,
+                    outputTokens,
+                    totalTokens: (inputTokens ?? 0) + (outputTokens ?? 0),
+                    ready: true,
+                  }
+                : undefined
+            if (evt.delta.stop_reason === 'tool_use') {
+              yield { type: 'finish', reason: 'tool_calls', ...(usage ? { usage } : {}) }
+            } else {
+              yield { type: 'finish', reason: 'stop', ...(usage ? { usage } : {}) }
+            }
           }
           break
-        }
         case 'error':
           throw new ProviderError(evt.error?.message ?? 'anthropic stream error')
       }

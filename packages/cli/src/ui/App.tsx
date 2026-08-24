@@ -3,7 +3,7 @@ import { Box, Text, useApp, useInput } from 'ink'
 import TextInput from 'ink-text-input'
 import { buildSystemPrompt, runAgentLoop } from '@hesdor/agent-core'
 import type { ApprovalRequest, RepoContextInfo, ToolContext } from '@hesdor/agent-core'
-import { undoLastChange } from '@hesdor/agent-core'
+import { redoLastChange, undoLastChange } from '@hesdor/agent-core'
 import type { AgentMode, ChatMessage, RunEvent } from '@hesdor/protocol'
 import { fetchModels, getPreset, PROVIDER_PRESETS } from '@hesdor/providers'
 import { loadConfig, saveConfig } from '../config.js'
@@ -13,6 +13,7 @@ import type { Session } from '../session.js'
 import { listSessions, loadSession, newSessionId, saveSession, titleFrom } from '../sessions.js'
 import type { CliFlags } from '../args.js'
 import { VERSION } from '../args.js'
+import { DiffReview, type DiffReviewRequest } from './DiffReview.js'
 import { ListPicker, PromptBox } from './pickers.js'
 
 type Item =
@@ -38,6 +39,7 @@ const BUILTIN_COMMANDS: CommandInfo[] = [
   { name: 'skills', description: 'available skills' },
   { name: 'plugins', description: 'plugins & mcp servers' },
   { name: 'undo', description: 'revert last file change' },
+  { name: 'redo', description: 're-apply last undo' },
   { name: 'sessions', description: 'recent conversations' },
   { name: 'resume', description: 'continue session #n' },
   { name: 'compact', description: 'summarize context' },
@@ -62,6 +64,7 @@ const TOOL_VERBS: Record<string, string> = {
   git_status: 'Status',
   git_diff: 'Diffing',
   git_log: 'History',
+  explore: 'Exploring',
 }
 
 function prettySummary(summary: string): string {
@@ -76,6 +79,10 @@ function buildSystem(session: Session, info: RepoContextInfo, mode: AgentMode): 
   const base = buildSystemPrompt(info, mode)
   return session.skillsSection ? `${base}\n\n${session.skillsSection}` : base
 }
+
+const SUBAGENT_SYSTEM =
+  'You are Hesdor\'s exploratory subagent. Investigate the given task using ONLY read tools (list_files, search_files, read_file, read_files, git_status, git_log). ' +
+  'Answer the task precisely in your final message and nothing else. Keep the answer under 800 words. If you cannot answer, say so. You have no write or execute permissions.'
 
 function useTerminalSize(): { columns: number; rows: number } {
   const [size, setSize] = useState({
@@ -113,11 +120,13 @@ export interface AppProps {
   session: Session
   /** Prompt from `hesdor "<prompt>"` — auto-submitted once on mount. */
   initialPrompt?: string
+  /** One-off endpoint supplied by `--base-url`. */
+  initialBaseUrl?: string
   keySource?: string
 }
 
 type PickerState =
-  | { kind: 'provider' }
+  | { kind: 'provider'; customProviders: string[] }
   | { kind: 'model'; loading: boolean; error?: string; models: string[] }
   | null
 
@@ -130,6 +139,7 @@ export function App({
   initialModel,
   session,
   initialPrompt,
+  initialBaseUrl,
   keySource,
 }: AppProps): React.ReactElement {
   const { exit } = useApp()
@@ -141,6 +151,7 @@ export function App({
   const [items, setItems] = useState<Item[]>([])
   const [running, setRunning] = useState(false)
   const [approval, setApproval] = useState<{ request: ApprovalRequest; resolve: (yes: boolean) => void } | null>(null)
+  const [review, setReview] = useState<{ request: DiffReviewRequest; resolve: (approved: boolean) => void } | null>(null)
   const [input, setInput] = useState('')
   const [scrollOffset, setScrollOffset] = useState(0)
   const [paletteSel, setPaletteSel] = useState(0)
@@ -153,13 +164,15 @@ export function App({
   const queueRef = useRef<string[]>([])
   const sessionIdRef = useRef(newSessionId())
   const sessionCreatedRef = useRef(Date.now())
+  const usageRef = useRef<{ totalTokens?: number; inputTokens?: number; outputTokens?: number } | null>(null)
+  const reviewAlwaysRef = useRef(false)
   const maxScrollRef = useRef(0)
   // Shared across runs so /undo can restore earlier file changes.
-  const stateRef = useRef<ToolContext['state']>({ activeChild: null, snapshots: [] })
+  const stateRef = useRef<ToolContext['state']>({ activeChild: null, snapshots: [], redo: [] })
 
   const SIDEBAR_W = 30
-  // header(1) + input box(3) + footer(1) + safety margin(1)
-  const bodyHeight = Math.max(4, size.rows - 6)
+  // header(3) + input box(3) + footer(3) + safety margin(1)
+  const bodyHeight = Math.max(4, size.rows - 10)
 
   const pushItem = useCallback((item: NewItem): void => {
     setItems((prev) => [...prev, { ...item, key: ++keyCounter.current } as Item])
@@ -270,7 +283,38 @@ export function App({
               setApproval({ request, resolve })
             }),
           approvalsEnabled: true,
+          reviewChange: (request) => {
+            if (reviewAlwaysRef.current) return Promise.resolve(true)
+            return new Promise<boolean>((resolve) => setReview({ request, resolve }))
+          },
           state: stateRef.current,
+          // Nested read-only agent backing the explore tool.
+          subagent: async (task, subMaxSteps = 5) => {
+            const subCtx: ToolContext = {
+              root: info.root,
+              mode: 'ask',
+              model: provider.model,
+              signal: controller.signal,
+              emit: () => {},
+              requestApproval: () => Promise.resolve(false),
+              approvalsEnabled: false,
+              state: stateRef.current,
+              subagent: undefined,
+            }
+            const subResult = await runAgentLoop({
+              provider,
+              registry: session.registry.readOnly(),
+              ctx: subCtx,
+              systemPrompt: SUBAGENT_SYSTEM,
+              userPrompt: task,
+              history: [],
+              maxSteps: Math.min(subMaxSteps, 10),
+            })
+            const lastText =
+              [...subResult.messages].reverse().find((m) => m.role === 'assistant' && m.content.trim() !== '')?.content ?? ''
+            if (!lastText) return subResult.error ?? 'subagent produced no answer'
+            return lastText.slice(0, 6000)
+          },
         }
 
         const system = buildSystem(session, info, mode)
@@ -285,6 +329,7 @@ export function App({
           ...(flags.maxSteps ? { maxSteps: flags.maxSteps } : {}),
         })
         historyRef.current = result.messages.filter((m) => m.role !== 'system')
+        if (result.usage?.ready) usageRef.current = result.usage
 
         void saveSession(info.root, {
           id: sessionIdRef.current,
@@ -312,39 +357,63 @@ export function App({
   )
 
   // ── pickers ───────────────────────────────────────────────────────────────
-  const openModelPicker = useCallback((): void => {
-    setPicker({ kind: 'model', loading: true, models: [] })
-    void (async () => {
-      try {
-        const [cfg, auth] = await Promise.all([loadConfig(), loadAuth()])
-        const preset = getPreset(providerId)
-        const baseUrl = cfg.baseUrls?.[providerId] ?? preset?.baseUrl ?? undefined
-        const envVal = preset?.envKey ? process.env[preset.envKey] : undefined
-        const apiKey = envVal ?? auth[providerId]
-        const models = await fetchModels({
-          provider: providerId,
-          ...(baseUrl ? { baseUrl } : {}),
-          ...(apiKey ? { apiKey } : {}),
-        })
-        if (models.length === 0) throw new Error('provider returned an empty catalog')
-        setPicker({ kind: 'model', loading: false, models })
-      } catch (err) {
-        setPicker({
-          kind: 'model',
-          loading: false,
-          models: [],
-          error: `${err instanceof Error ? err.message : String(err)} — check /provider setup`,
-        })
-      }
-    })()
-  }, [providerId])
+  const openModelPicker = useCallback(
+    (targetProviderId = providerId, targetBaseUrl?: string): void => {
+      setPicker({ kind: 'model', loading: true, models: [] })
+      void (async () => {
+        try {
+          const [cfg, auth] = await Promise.all([loadConfig(), loadAuth()])
+          const preset = getPreset(targetProviderId)
+          const custom = cfg.customProviders?.[targetProviderId]
+          const baseUrl =
+            targetBaseUrl ??
+            (targetProviderId === initialProviderId ? initialBaseUrl : undefined) ??
+            cfg.baseUrls?.[targetProviderId] ??
+            custom?.baseUrl ??
+            (preset?.baseUrlEnvKey ? process.env[preset.baseUrlEnvKey] : undefined) ??
+            preset?.baseUrl ??
+            undefined
+          const envKey = preset?.envKey ?? (custom ? 'HESDOR_CUSTOM_API_KEY' : undefined)
+          const envVal = envKey ? process.env[envKey] : undefined
+          const apiKey = envVal ?? auth[targetProviderId]
+          const models = await fetchModels({
+            provider: targetProviderId,
+            customKind: preset?.kind ?? custom?.kind ?? (baseUrl ? 'openai' : undefined),
+            ...(baseUrl ? { baseUrl } : {}),
+            ...(apiKey ? { apiKey } : {}),
+          })
+          if (models.length === 0) throw new Error('provider returned an empty catalog')
+          setPicker({ kind: 'model', loading: false, models })
+        } catch (err) {
+          setPicker({
+            kind: 'model',
+            loading: false,
+            models: [],
+            error: `${err instanceof Error ? err.message : String(err)} — check /provider setup`,
+          })
+        }
+      })()
+    },
+    [initialBaseUrl, initialProviderId, providerId],
+  )
+
+  const openProviderPicker = useCallback((): void => {
+    setPicker({ kind: 'provider', customProviders: [] })
+    void loadConfig().then((cfg) => {
+      setPicker((current) =>
+        current?.kind === 'provider'
+          ? { ...current, customProviders: Object.keys(cfg.customProviders ?? {}).sort() }
+          : current,
+      )
+    })
+  }, [])
 
   const finishProviderSetup = useCallback(
     (id: string): void => {
       setProviderId(id)
       void saveConfig({ provider: id })
       pushItem({ kind: 'status', text: `provider → ${id} (saved)`, tone: 'info' })
-      openModelPicker()
+      openModelPicker(id)
     },
     [openModelPicker, pushItem],
   )
@@ -353,13 +422,22 @@ export function App({
   const beginProviderSetup = useCallback(
     (id: string): void => {
       void (async () => {
+        const [cfg, auth] = await Promise.all([loadConfig(), loadAuth()])
         const preset = getPreset(id)
-        if (!preset) {
+        const custom = cfg.customProviders?.[id]
+        if (!preset && !custom) {
           pushItem({ kind: 'status', text: `unknown provider "${id}"`, tone: 'error' })
           return
         }
-        const [cfg, auth] = await Promise.all([loadConfig(), loadAuth()])
-        const hasUrl = Boolean(preset.baseUrl ?? cfg.baseUrls?.[id])
+        if (custom) {
+          setProviderId(id)
+          void saveConfig({ provider: id })
+          pushItem({ kind: 'status', text: `provider set to ${id} (saved)`, tone: 'info' })
+          openModelPicker(id)
+          return
+        }
+        if (!preset) return
+        const hasUrl = Boolean(preset.baseUrl ?? cfg.baseUrls?.[id] ?? (preset.baseUrlEnvKey ? process.env[preset.baseUrlEnvKey] : undefined))
         const envVal = preset.envKey ? process.env[preset.envKey] : undefined
         const hasKey = !preset.requiresApiKey || Boolean(envVal || auth[id])
         if (!hasUrl) setSetup({ kind: 'url', provider: id })
@@ -367,7 +445,7 @@ export function App({
         else finishProviderSetup(id)
       })()
     },
-    [finishProviderSetup, pushItem],
+    [finishProviderSetup, openModelPicker, pushItem],
   )
 
   const commandNames = useMemo<string[]>(
@@ -431,7 +509,7 @@ export function App({
             pushItem({ kind: 'status', text: `provider set to ${target} (saved)`, tone: 'info' })
             return
           }
-          setPicker({ kind: 'provider' })
+          openProviderPicker()
           return
         }
         case 'tools': {
@@ -478,6 +556,26 @@ export function App({
               kind: 'status',
               text: res.undone ? `undid ${res.path}` : 'nothing to undo',
               tone: res.undone ? 'success' : 'warn',
+            })
+          })
+          return
+        }
+        case 'redo': {
+          const redoCtx: ToolContext = {
+            root: info.root,
+            mode,
+            model,
+            signal: new AbortController().signal,
+            emit: handleEvent,
+            requestApproval: () => Promise.resolve(true),
+            approvalsEnabled: true,
+            state: stateRef.current,
+          }
+          void redoLastChange(redoCtx).then((res) => {
+            pushItem({
+              kind: 'status',
+              text: res.redone ? `redid ${res.path}` : 'nothing to redo',
+              tone: res.redone ? 'success' : 'warn',
             })
           })
           return
@@ -588,6 +686,8 @@ export function App({
           setItems([])
           historyRef.current = []
           stateRef.current.snapshots = []
+          stateRef.current.redo = []
+          reviewAlwaysRef.current = false
           sessionIdRef.current = newSessionId()
           sessionCreatedRef.current = Date.now()
           pushItem({ kind: 'status', text: `new session ${sessionIdRef.current}`, tone: 'info' })
@@ -596,6 +696,7 @@ export function App({
           setItems([])
           historyRef.current = []
           stateRef.current.snapshots = []
+          stateRef.current.redo = []
           return
         case 'help':
           pushItem({
@@ -625,7 +726,7 @@ export function App({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [commandNames, exit, flags, handleEvent, info.root, mode, model, openModelPicker, pushItem, running, session, startRun],
+    [commandNames, exit, flags, handleEvent, info.root, mode, model, openModelPicker, openProviderPicker, pushItem, running, session, startRun],
   )
 
   const handleSubmit = useCallback(
@@ -660,7 +761,7 @@ export function App({
       exit()
       return
     }
-    if (approval || picker) return
+    if (approval || picker || review) return
 
     const paletteOpen = input.startsWith('/')
 
@@ -703,8 +804,9 @@ export function App({
   // ── layout math ───────────────────────────────────────────────────────────
   const paletteVisible = paletteFiltered.length > 0 && input.startsWith('/')
   const paletteRows = paletteVisible ? paletteFiltered.length + 3 : 0
-  const paneWidth = Math.max(20, size.columns - SIDEBAR_W)
-  const budget = Math.max(3, bodyHeight - (picker ? 0 : paletteRows))
+  const showSidebar = size.columns >= 96 && !picker
+  const paneWidth = showSidebar ? Math.max(30, size.columns - SIDEBAR_W) : Math.max(20, size.columns)
+  const budget = Math.max(3, bodyHeight - 2 - (picker ? 0 : paletteRows))
 
   const windowEnd = items.length - scrollOffset
   let acc = 0
@@ -721,11 +823,12 @@ export function App({
   })
 
   const modeColor = mode === 'build' ? 'green' : mode === 'plan' ? 'yellow' : 'blue'
-  const accent = approval ? 'red' : picker ? 'cyan' : running ? 'cyan' : modeColor
+  const accent = approval ? 'red' : review ? 'magenta' : picker ? 'cyan' : running ? 'cyan' : modeColor
 
   const sidebarRows: Array<[string, string] | null> = [
     ['session', sessionIdRef.current.slice(0, 10)],
     ['messages', String(historyRef.current.length)],
+    ['tokens', usageRef.current?.totalTokens != null ? String(usageRef.current.totalTokens) : '—'],
     ['undo depth', String(stateRef.current.snapshots.length)],
     null,
     ['branch', info.branch ?? '—'],
@@ -742,14 +845,14 @@ export function App({
   return (
     <Box flexDirection="column" height={size.rows}>
       {/* header */}
-      <Box justifyContent="space-between">
+      <Box borderStyle="round" borderColor={accent} paddingX={1} justifyContent="space-between">
         <Text>
           <Text color="cyan" bold>
             ◆ hesdor
           </Text>{' '}
           <Text dimColor>v{VERSION}</Text>
         </Text>
-        <Text dimColor>
+        <Text dimColor wrap="truncate-end">
           {info.name}:{info.branch ?? '—'} ·{' '}
           <Text color={modeColor}>{mode}</Text> · {providerId}/{model}
           {keySource === 'stored' ? ' 🔒' : ''}
@@ -757,8 +860,23 @@ export function App({
       </Box>
 
       {/* body */}
-      <Box flexDirection="row">
-        <Box flexDirection="column" width={paneWidth}>
+      <Box flexDirection="row" flexGrow={1}>
+        <Box flexDirection="column" width={paneWidth} borderStyle="round" borderColor={running ? 'cyan' : 'gray'} paddingX={1}>
+          <Box justifyContent="space-between">
+            <Text bold color="cyan">
+              ACTIVITY
+            </Text>
+            <Text dimColor>{running ? `${spinner} working` : `${items.length} events`}</Text>
+          </Box>
+          {shown.length === 0 && (
+            <Box flexDirection="column" paddingY={1}>
+              <Text color="cyan" bold>
+                Ready when you are.
+              </Text>
+              <Text dimColor>Ask Hesdor to inspect, plan, or change this repository.</Text>
+              <Text dimColor>Try: find the failing tests</Text>
+            </Box>
+          )}
           {shown.map((item) => (
             <Box key={item.key} flexDirection="column">
               {item.kind === 'user' && (
@@ -766,7 +884,12 @@ export function App({
                   ❯ {item.text}
                 </Text>
               )}
-              {item.kind === 'assistant' && <Text color={item.live ? 'gray' : undefined}>{item.text}</Text>}
+              {item.kind === 'assistant' && (
+                <Text color={item.live ? 'gray' : undefined}>
+                  <Text color="cyan">◆ </Text>
+                  {item.text}
+                </Text>
+              )}
               {item.kind === 'tool' && (
                 <Text
                   dimColor={item.state !== 'fail'}
@@ -793,8 +916,11 @@ export function App({
           {windowStart > 0 && <Text dimColor>··· ↑ {windowStart} earlier ···</Text>}
         </Box>
 
-        {!picker && (
-          <Box flexDirection="column" width={SIDEBAR_W} borderLeft borderColor="gray" paddingLeft={1}>
+        {showSidebar && (
+          <Box flexDirection="column" width={SIDEBAR_W} borderStyle="round" borderColor="gray" paddingX={1}>
+            <Text bold color="cyan">
+              SESSION
+            </Text>
             {sidebarRows.slice(-Math.max(3, bodyHeight - 1)).map((row, i) =>
               row === null ? (
                 <Text key={`gap-${i}`}> </Text>
@@ -834,16 +960,19 @@ export function App({
       {picker?.kind === 'provider' && (
         <ListPicker
           title="Switch provider"
-          items={PROVIDER_PRESETS.map((p) => ({
-            value: p.id,
-            label: p.id,
-            hint:
-              p.id === 'openai-compatible' || p.id === 'anthropic-compatible'
-                ? 'custom endpoint — will ask for URL + key'
-                : p.requiresApiKey
-                  ? (p.envKey ?? '')
-                  : 'local · no key',
-          }))}
+          items={[
+            ...PROVIDER_PRESETS.map((p) => ({
+              value: p.id,
+              label: p.id,
+              hint:
+                p.id === 'openai-compatible' || p.id === 'anthropic-compatible'
+                  ? 'custom endpoint — will ask for URL + key'
+                  : p.requiresApiKey
+                    ? (p.envKey ?? '')
+                    : 'local · no key',
+            })),
+            ...picker.customProviders.map((id) => ({ value: id, label: id, hint: 'saved custom endpoint' })),
+          ]}
           onPick={(id) => {
             setPicker(null)
             beginProviderSetup(id)
@@ -871,7 +1000,7 @@ export function App({
       {setup?.kind === 'url' && (
         <PromptBox
           title={`Base URL for ${setup.provider}`}
-          placeholder="https://your-endpoint/v1"
+          placeholder={getPreset(setup.provider)?.kind === 'anthropic' ? 'https://your-endpoint' : 'https://your-endpoint/v1'}
           onCancel={() => setSetup(null)}
           onSubmit={(url) => {
             const id = setup.provider
@@ -909,9 +1038,11 @@ export function App({
       )}
 
       {/* input dock */}
-      {!picker && !approval && !setup && (
+      {!picker && !approval && !review && !setup && (
         <Box borderStyle="round" borderColor={accent} paddingX={1}>
-          <Text color="green">{'> '}</Text>
+          <Text color="green" bold>
+            {'› '}
+          </Text>
           <TextInput
             value={input}
             onChange={(v) => {
@@ -935,8 +1066,19 @@ export function App({
         />
       )}
 
+      {review && (
+        <DiffReview
+          request={review.request}
+          onResolve={(decision) => {
+            if (decision === 'always') reviewAlwaysRef.current = true
+            review.resolve(decision !== 'reject')
+            setReview(null)
+          }}
+        />
+      )}
+
       {/* footer */}
-      <Box justifyContent="space-between">
+      <Box borderStyle="single" borderColor="gray" paddingX={1} justifyContent="space-between">
         <Text>
           <Text color={modeColor}>{running ? spinner : '●'} {mode}</Text>
           <Text dimColor>
