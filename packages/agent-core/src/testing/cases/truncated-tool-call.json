@@ -1,0 +1,28 @@
+{
+  "name": "truncated-tool-call",
+  "description": "A write_file call cut off by the output token limit is not run; the model retries with a smaller write.",
+  "interactions": [
+    {
+      "match": { "role": "user" },
+      "chunks": [
+        { "type": "text", "text": "Writing the file." },
+        { "type": "tool_call", "index": 0, "id": "c1", "name": "write_file", "argumentsDelta": "{\"path\":\"big.txt\",\"content\":\"aaaaaaaaaaaaaaaa" },
+        { "type": "finish", "reason": "length" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c1", "contains": ["max output token limit", "NOT run"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c2", "name": "write_file", "argumentsDelta": "{\"path\":\"big.txt\",\"content\":\"part one\\n\"}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c2", "contains": ["bytes: 9"] },
+      "chunks": [
+        { "type": "text", "text": "Wrote the first part." },
+        { "type": "finish", "reason": "stop" }
+      ]
+    }
+  ]
+}
