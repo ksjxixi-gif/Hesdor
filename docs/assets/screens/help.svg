@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="838" height="655" viewBox="0 0 838.4 655" role="img" aria-label="hesdor --help">
+<style>text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono","Liberation Mono",monospace;font-size:14px;white-space:pre}</style>
+<rect x="0.5" y="0.5" width="837.4" height="654" rx="10" fill="#0f1115" stroke="#2a2f38"/>
+<path d="M0.5 34V10.5a10 10 0 0 1 10-10H827.9a10 10 0 0 1 10 10V34Z" fill="#191c22"/>
+<line x1="0.5" y1="34" x2="837.9" y2="34" stroke="#2a2f38"/>
+<circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
+<text x="419.2" y="22" fill="#8b93a1" text-anchor="middle" style="font-size:13px">hesdor --help</text>
+<g fill="#d4d8de" xml:space="preserve">
+<text x="16.0" y="64" fill="#8cc97a" textLength="58.8" lengthAdjust="spacingAndGlyphs">~/slugs</text>
+<text x="83.2" y="64" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">$</text>
+<text x="100.0" y="64" textLength="109.2" lengthAdjust="spacingAndGlyphs">hesdor --help</text>
+<text x="16.0" y="83" textLength="420.0" lengthAdjust="spacingAndGlyphs">Hesdor — local-first AI software engineering agent</text>
+<text x="16.0" y="121" textLength="50.4" lengthAdjust="spacingAndGlyphs">Usage:</text>
+<text x="32.8" y="140" textLength="646.8" lengthAdjust="spacingAndGlyphs">hesdor                       Start interactive mode in the current repository</text>
+<text x="32.8" y="159" textLength="646.8" lengthAdjust="spacingAndGlyphs">hesdor &quot;&lt;prompt&gt;&quot;            Start interactive and immediately run the prompt</text>
+<text x="32.8" y="178" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor run &quot;&lt;prompt&gt;&quot;        Agent with write+execute access (build mode)</text>
+<text x="32.8" y="197" textLength="520.8" lengthAdjust="spacingAndGlyphs">hesdor plan &quot;&lt;task&gt;&quot;         Read-only implementation planning</text>
+<text x="32.8" y="216" textLength="604.8" lengthAdjust="spacingAndGlyphs">hesdor ask &quot;&lt;question&gt;&quot;      Read-only question answering about the repo</text>
+<text x="32.8" y="235" textLength="638.4" lengthAdjust="spacingAndGlyphs">hesdor review [&quot;&lt;focus&gt;&quot;]    Read-only review of HEAD against the merge base</text>
+<text x="276.4" y="254" textLength="327.6" lengthAdjust="spacingAndGlyphs">with the default branch: P0-P3 findings</text>
+<text x="16.0" y="292" textLength="50.4" lengthAdjust="spacingAndGlyphs">Setup:</text>
+<text x="32.8" y="311" textLength="655.2" lengthAdjust="spacingAndGlyphs">hesdor setup                 Choose provider, store API key, set default model</text>
+<text x="32.8" y="330" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor login chatgpt         Continue with ChatGPT: use your ChatGPT plan</text>
+<text x="276.4" y="349" textLength="243.6" lengthAdjust="spacingAndGlyphs">(browser sign-in, no API key)</text>
+<text x="32.8" y="368" textLength="596.4" lengthAdjust="spacingAndGlyphs">hesdor logout chatgpt        Sign out of ChatGPT and revoke the session</text>
+<text x="32.8" y="387" textLength="436.8" lengthAdjust="spacingAndGlyphs">hesdor pricing               Show Hesdor Cloud plans</text>
+<text x="32.8" y="406" textLength="512.4" lengthAdjust="spacingAndGlyphs">hesdor provider [&lt;id&gt;]       Show or set the default provider</text>
+<text x="32.8" y="425" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor model [&lt;id&gt;]          Show or set the default model (per provider)</text>
+<text x="32.8" y="444" textLength="596.4" lengthAdjust="spacingAndGlyphs">hesdor auth list             Providers with a saved key (values hidden)</text>
+<text x="32.8" y="463" textLength="487.2" lengthAdjust="spacingAndGlyphs">hesdor auth logout &lt;id&gt;      Delete a provider&apos;s saved key</text>
+<text x="32.8" y="482" textLength="604.8" lengthAdjust="spacingAndGlyphs">hesdor init                  Create HESDOR.md and .hesdorignore starters</text>
+<text x="32.8" y="501" textLength="579.6" lengthAdjust="spacingAndGlyphs">hesdor doctor                Check environment, tools and credentials</text>
+<text x="32.8" y="520" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor policy check &lt;cmd...&gt; Show whether run_command would allow, ask or</text>
+<text x="276.4" y="539" textLength="319.2" lengthAdjust="spacingAndGlyphs">deny a command, and which rule decides</text>
+<text x="32.8" y="558" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor mcp list              MCP servers: scope, transport, status, login</text>
+<text x="32.8" y="577" textLength="403.2" lengthAdjust="spacingAndGlyphs">hesdor mcp add &lt;name&gt; &lt;command...&gt; | --url &lt;url&gt;</text>
+<text x="276.4" y="596" textLength="285.6" lengthAdjust="spacingAndGlyphs">Add a server to your user mcp.json</text>
+<text x="32.8" y="615" textLength="588.0" lengthAdjust="spacingAndGlyphs">hesdor mcp login|logout &lt;name&gt;  OAuth login (browser) or forget tokens</text>
+<text x="32.8" y="634" textLength="621.6" lengthAdjust="spacingAndGlyphs">hesdor acp                  Serve the Agent Client Protocol on stdio (Zed,</text>
+</g>
+</svg>
