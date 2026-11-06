@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GitIgnoreMatcher } from './ignore.js'
+import { GitIgnoreMatcher, globToRegex } from './ignore.js'
 
 describe('GitIgnoreMatcher', () => {
   it('ignores default junk directories', () => {
@@ -47,5 +47,33 @@ describe('GitIgnoreMatcher', () => {
     const m = new GitIgnoreMatcher(['# comment', '', 'temp.txt'])
     expect(m.ignored('temp.txt')).toBe(true)
     expect(m.ignored('# comment')).toBe(false)
+  })
+
+  it('anchored directory patterns honor the trailing slash and cover the directory contents', () => {
+    const m = new GitIgnoreMatcher(['/out/', 'src/gen'])
+    expect(m.ignored('out', true)).toBe(true)
+    expect(m.ignored('out', false)).toBe(false) // a file named out is not the directory
+    expect(m.ignored('out/a.js')).toBe(true)
+    expect(m.ignored('pkg/out/a.js')).toBe(false)
+    expect(m.ignored('src/gen/x.ts')).toBe(true)
+    expect(m.ignored('lib/src/gen/x.ts')).toBe(false)
+  })
+
+  it('supports [!abc] negated classes and backslash escapes', () => {
+    const m = new GitIgnoreMatcher(['file[!0-9].txt', '\\#notes', '\\!bang', 'a\\*b'])
+    expect(m.ignored('fileA.txt')).toBe(true)
+    expect(m.ignored('file1.txt')).toBe(false)
+    expect(m.ignored('#notes')).toBe(true)
+    expect(m.ignored('!bang')).toBe(true)
+    expect(m.ignored('a*b')).toBe(true)
+    expect(m.ignored('axxb')).toBe(false)
+  })
+})
+
+describe('globToRegex', () => {
+  it('expands braces only when asked', () => {
+    expect(globToRegex('**/*.{ts,tsx}', true).test('src/a/b.tsx')).toBe(true)
+    expect(globToRegex('**/*.{ts,tsx}', true).test('b.js')).toBe(false)
+    expect(globToRegex('{a,b}').test('{a,b}')).toBe(true)
   })
 })
