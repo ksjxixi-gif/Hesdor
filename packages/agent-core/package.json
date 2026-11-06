@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@hesdor/protocol": "workspace:*",
+    "@modelcontextprotocol/client": "^2.4.0",
     "zod": "^4.4.3"
   }
 }
