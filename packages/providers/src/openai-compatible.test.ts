@@ -96,7 +96,55 @@ describe('OpenAICompatibleProvider', () => {
           apiKey: 'test-key',
         }),
       ).resolves.toEqual(['internal-model'])
-      expect(fetchMock.mock.calls[0]?.[0]).toBe('https://llm.example.test/v1/models')
+      expect(fetchMock.mock.calls[0]?.[0]).toBe('https://llm.example.test/v1/models?limit=1000')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('AnthropicProvider request shape', () => {
+  it('drops empty assistant turns instead of sending an empty text block', async () => {
+    const body = 'data: {"type":"message_stop"}\n\n'
+    const fetchMock = vi.fn().mockResolvedValue(new Response(body))
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      const provider = new AnthropicProvider({ baseUrl: 'http://localhost:9/', model: 'claude-test', apiKey: 'k' })
+      const history = [
+        { role: 'system' as const, content: 'sys' },
+        { role: 'user' as const, content: 'first' },
+        { role: 'assistant' as const, content: '' }, // stored by older versions after a bare end_turn
+        { role: 'user' as const, content: 'second' },
+      ]
+      for await (const _chunk of provider.stream(history, [], new AbortController().signal)) {
+        // drain
+      }
+      const sent = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as {
+        messages: Array<{ role: string; content: Array<{ type: string; text?: string }> }>
+      }
+      expect(sent.messages.map((m) => m.role)).toEqual(['user', 'user'])
+      expect(sent.messages.flatMap((m) => m.content).some((b) => b.type === 'text' && b.text === '')).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})
+
+describe('OpenAICompatibleProvider usage details', () => {
+  it('reports cached prompt tokens and a provider-reported cost', async () => {
+    const events = [
+      { choices: [{ delta: { content: 'x' } }] },
+      { choices: [{ finish_reason: 'stop' }] },
+      { choices: [], usage: { prompt_tokens: 100, completion_tokens: 5, total_tokens: 105, prompt_tokens_details: { cached_tokens: 80 }, cost: 0.0021 } },
+      '[DONE]',
+    ]
+    const body = events.map((e) => `data: ${typeof e === 'string' ? e : JSON.stringify(e)}\n\n`).join('')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body)))
+    try {
+      const provider = new OpenAICompatibleProvider({ baseUrl: 'http://localhost:1234/v1', model: 'test' })
+      const chunks: StreamChunk[] = []
+      for await (const chunk of provider.stream([], [], new AbortController().signal)) chunks.push(chunk)
+      expect(chunks.at(-1)).toMatchObject({ type: 'finish', usage: { inputTokens: 100, cacheReadTokens: 80, costUsd: 0.0021 } })
     } finally {
       vi.unstubAllGlobals()
     }
