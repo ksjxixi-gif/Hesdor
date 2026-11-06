@@ -1,0 +1,29 @@
+{
+  "name": "read-then-edit",
+  "description": "Reads a file, then renames a function with apply_patch, then answers.",
+  "interactions": [
+    {
+      "match": { "role": "user", "contains": ["Rename greet to welcome"] },
+      "chunks": [
+        { "type": "text", "text": "Let me look at the file first." },
+        { "type": "tool_call", "index": 0, "id": "c1", "name": "read_file", "argumentsDelta": "{\"path\":" },
+        { "type": "tool_call", "index": 0, "argumentsDelta": "\"src/app.ts\"}" },
+        { "type": "finish", "reason": "tool_calls", "usage": { "inputTokens": 900, "outputTokens": 40, "totalTokens": 940, "ready": true } }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c1", "contains": ["export function greet(name: string)"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c2", "name": "apply_patch", "argumentsDelta": "{\"path\":\"src/app.ts\",\"edits\":[{\"find\":\"export function greet(\",\"replace\":\"export function welcome(\"}]}" },
+        { "type": "finish", "reason": "tool_calls", "usage": { "inputTokens": 1000, "outputTokens": 60, "totalTokens": 1060, "ready": true } }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c2", "contains": ["applied: 1"] },
+      "chunks": [
+        { "type": "text", "text": "Renamed greet to welcome in src/app.ts." },
+        { "type": "finish", "reason": "stop", "usage": { "inputTokens": 1100, "outputTokens": 12, "totalTokens": 1112, "ready": true } }
+      ]
+    }
+  ]
+}
