@@ -3,7 +3,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createDefaultRegistry, redoLastChange, undoLastChange } from './index.js'
-import type { RunEvent, ToolContext } from '@hesdor/protocol'
+import type { RunEvent } from '@hesdor/protocol'
+import type { ToolContext } from './context.js'
 
 function makeCtx(root: string): { ctx: ToolContext; events: RunEvent[] } {
   const events: RunEvent[] = []
@@ -80,6 +81,32 @@ describe('undoLastChange', () => {
     // and the restored v2 state is undoable again
     expect((await undoLastChange(ctx)).undone).toBe(true)
     expect(await readFile(path.join(root, 'a.txt'), 'utf8')).toBe('v1\n')
+  })
+
+  it('restores binary files byte for byte (overwrite and delete)', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'hesdor-undo-bin-'))
+    const registry = createDefaultRegistry()
+    const { ctx } = makeCtx(root)
+    const { readFile, writeFile } = await import('node:fs/promises')
+    // Invalid UTF-8 (0xff, lone continuation bytes) is what a utf8 round-trip corrupts.
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe, 0x80, 0xc3, 0x28])
+    await writeFile(path.join(root, 'logo.png'), png)
+    await writeFile(path.join(root, 'font.bin'), png)
+
+    await registry.get('write_file')!.execute({ path: 'logo.png', content: 'oops' }, ctx)
+    await registry.get('delete_file')!.execute({ path: 'font.bin' }, ctx)
+    await undoLastChange(ctx)
+    await undoLastChange(ctx)
+    expect((await readFile(path.join(root, 'logo.png'))).equals(png)).toBe(true)
+    expect((await readFile(path.join(root, 'font.bin'))).equals(png)).toBe(true)
+
+    // redo puts back the exact bytes captured at undo time, then undo restores the binary again
+    await redoLastChange(ctx)
+    await redoLastChange(ctx)
+    expect(await readFile(path.join(root, 'logo.png'), 'utf8')).toBe('oops')
+    await undoLastChange(ctx)
+    await undoLastChange(ctx)
+    expect((await readFile(path.join(root, 'logo.png'))).equals(png)).toBe(true)
   })
 
   it('clears redo history after a new mutation', async () => {
