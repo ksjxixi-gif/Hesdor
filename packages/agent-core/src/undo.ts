@@ -2,7 +2,16 @@ import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { ToolContext } from './context.js'
 
-async function writeSnapshot(snapshot: { path: string; content: string | null }): Promise<void> {
+/** Raw bytes (binary-safe), or null when the file does not exist. */
+async function readCurrent(file: string): Promise<Buffer | null> {
+  try {
+    return await readFile(file)
+  } catch {
+    return null
+  }
+}
+
+async function writeSnapshot(snapshot: { path: string; content: Buffer | null }): Promise<void> {
   if (snapshot.content === null) {
     try {
       await unlink(snapshot.path)
@@ -11,7 +20,7 @@ async function writeSnapshot(snapshot: { path: string; content: string | null })
     }
   } else {
     await mkdir(path.dirname(snapshot.path), { recursive: true })
-    await writeFile(snapshot.path, snapshot.content, 'utf8')
+    await writeFile(snapshot.path, snapshot.content)
   }
 }
 
@@ -23,12 +32,7 @@ export async function undoLastChange(ctx: ToolContext): Promise<{ undone: boolea
   const snapshot = ctx.state.snapshots.at(-1)
   if (!snapshot) return { undone: false }
 
-  let current: string | null = null
-  try {
-    current = await readFile(snapshot.path, 'utf8')
-  } catch {
-    // file did not exist
-  }
+  const current = await readCurrent(snapshot.path)
   await writeSnapshot(snapshot)
   ctx.state.snapshots.pop()
   ctx.state.redo.push({ path: snapshot.path, content: current })
@@ -41,12 +45,7 @@ export async function redoLastChange(ctx: ToolContext): Promise<{ redone: boolea
   const snapshot = ctx.state.redo.at(-1)
   if (!snapshot) return { redone: false }
 
-  let current: string | null = null
-  try {
-    current = await readFile(snapshot.path, 'utf8')
-  } catch {
-    // file did not exist
-  }
+  const current = await readCurrent(snapshot.path)
   await writeSnapshot(snapshot)
   ctx.state.redo.pop()
   ctx.state.snapshots.push({ path: snapshot.path, content: current })
