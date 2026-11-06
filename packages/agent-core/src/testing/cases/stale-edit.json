@@ -1,0 +1,41 @@
+{
+  "name": "stale-edit",
+  "description": "The file changes on disk after the agent read it; apply_patch refuses, the model re-reads and patches without losing the outside edit.",
+  "interactions": [
+    {
+      "match": { "role": "user" },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c1", "name": "read_file", "argumentsDelta": "{\"path\":\"src/app.ts\"}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c1", "contains": ["hello"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c2", "name": "apply_patch", "argumentsDelta": "{\"path\":\"src/app.ts\",\"edits\":[{\"find\":\"hello\",\"replace\":\"hi\"}]}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c2", "contains": ["changed since you read it"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c3", "name": "read_file", "argumentsDelta": "{\"path\":\"src/app.ts\"}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c3", "contains": ["edited outside the agent"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c4", "name": "apply_patch", "argumentsDelta": "{\"path\":\"src/app.ts\",\"edits\":[{\"find\":\"hello\",\"replace\":\"hi\"}]}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c4", "contains": ["applied: 1"] },
+      "chunks": [
+        { "type": "text", "text": "Patched after re-reading." },
+        { "type": "finish", "reason": "stop" }
+      ]
+    }
+  ]
+}
