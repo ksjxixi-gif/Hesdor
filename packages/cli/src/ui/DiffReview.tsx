@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Text, useInput } from 'ink'
-import { capDiff, diffStats, unifiedDiff } from '../diff.js'
+import { diffStats, showWhitespace, unifiedDiff } from '../diff.js'
 
 export interface DiffReviewRequest {
   path: string
@@ -10,77 +10,96 @@ export interface DiffReviewRequest {
 
 export interface DiffReviewProps {
   request: DiffReviewRequest
-  /** Rendered height budget for the diff body. */
+  /** Diff rows shown at once (the rest scrolls). */
   maxLines?: number
+  /** The session has read web or MCP output (ToolContext state.tainted). */
+  tainted?: boolean
   onResolve: (decision: 'accept' | 'reject' | 'always') => void
 }
 
+/** Keystrokes arriving this soon after a prompt opens were typed for something else. */
+export const PROMPT_ARM_MS = 300
+
 /**
- * Codex-style change review: colored unified diff with accept/reject.
- * `a` (always) accepts this and every future change for the session.
+ * Ref that turns true PROMPT_ARM_MS after mount. Approval prompts ignore input
+ * until then, so type-ahead ("make it async") cannot answer them.
  */
-export function DiffReview({ request, maxLines = 16, onResolve }: DiffReviewProps): React.ReactElement {
-  const body = useMemo(() => {
-    if (request.before === null) {
-      return capDiff(fileLines(request.after).map((text) => ({ kind: 'add' as const, text })))
-    }
-    if (request.after === null) {
-      return capDiff(fileLines(request.before).map((text) => ({ kind: 'del' as const, text })))
-    }
-    return capDiff(unifiedDiff(request.before, request.after))
-  }, [request])
+export function useArmed(ms = PROMPT_ARM_MS): React.MutableRefObject<boolean> {
+  const armed = useRef(false)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      armed.current = true
+    }, ms)
+    return () => clearTimeout(timer)
+  }, [ms])
+  return armed
+}
 
-  const stats = useMemo(() => diffStats(body.lines), [body])
-  const shown = useMemo(() => {
-    const limit = Math.max(1, maxLines)
-    if (body.lines.length <= limit) return body.lines
-    const head = Math.ceil((limit - 1) / 2)
-    const tail = Math.max(0, limit - 1 - head)
-    return [
-      ...body.lines.slice(0, head),
-      { kind: 'meta' as const, text: '· · · middle omitted · · ·' },
-      ...(tail > 0 ? body.lines.slice(-tail) : []),
-    ]
-  }, [body, maxLines])
-  const hidden = shown.length < body.lines.length
+/**
+ * Codex-style change review: the whole diff, scrollable (arrows, PgUp/PgDn, Home/End), with
+ * line numbers, @@ hunk headers and visible whitespace on changed lines.
+ * Shift+A (always) accepts this and every future change for the session;
+ * Enter does nothing, so a stray keypress never approves.
+ */
+export function DiffReview({ request, maxLines = 16, tainted, onResolve }: DiffReviewProps): React.ReactElement {
+  const lines = useMemo(() => unifiedDiff(request.before ?? '', request.after ?? ''), [request])
+  const stats = useMemo(() => diffStats(lines), [lines])
+  const numWidth = useMemo(() => String(lines.reduce((max, l) => Math.max(max, l.oldNo ?? 0, l.newNo ?? 0), 1)).length, [lines])
+  const page = Math.max(1, maxLines)
+  const maxTop = Math.max(0, lines.length - page)
+  const [top, setTop] = useState(0)
+  const first = Math.min(top, maxTop)
+  const shown = lines.slice(first, first + page)
 
+  const armed = useArmed()
   useInput((ch, key) => {
-    if (ch === 'y' || ch === 'Y' || key.return) onResolve('accept')
+    // Scrolling is not a decision, so it works before the prompt is armed.
+    if (key.upArrow) setTop(Math.max(0, first - 1))
+    else if (key.downArrow) setTop(Math.min(maxTop, first + 1))
+    else if (key.pageUp) setTop(Math.max(0, first - page + 1))
+    else if (key.pageDown) setTop(Math.min(maxTop, first + page - 1))
+    else if (key.home) setTop(0)
+    else if (key.end) setTop(maxTop)
+    else if (!armed.current) return
+    else if (ch === 'y' || ch === 'Y') onResolve('accept')
     else if (ch === 'n' || ch === 'N' || key.escape) onResolve('reject')
-    else if (ch === 'a' || ch === 'A') onResolve('always')
+    else if (ch === 'A') onResolve('always')
   })
 
+  const num = (n: number | undefined): string => (n === undefined ? '' : String(n)).padStart(numWidth)
   return (
     <Box flexDirection="column" borderStyle="round" borderColor="magenta" paddingX={1}>
-      <Text>
+      <Text wrap="truncate">
         <Text bold color="magenta">
           ⧉ review change
         </Text>{' '}
-        <Text bold>{request.path}</Text>{' '}
-        <Text color="green">+{stats.added}</Text> <Text color="red">-{stats.removed}</Text>
-        {body.truncated || hidden ? <Text dimColor> (truncated)</Text> : undefined}
-      </Text>
-      {shown.map((line, idx) => (
-        <Text
-          key={idx}
-          color={line.kind === 'add' ? 'green' : line.kind === 'del' ? 'red' : 'gray'}
-          dimColor={line.kind === 'ctx' || line.kind === 'meta'}
-          wrap="truncate"
-        >
-          {line.kind === 'add' ? '+ ' : line.kind === 'del' ? '- ' : '  '}
-          {line.text}
+        <Text bold>{request.path}</Text> <Text color="green">+{stats.added}</Text> <Text color="red">-{stats.removed}</Text>
+        <Text dimColor>
+          {request.before === null ? ' (new file)' : request.after === null ? ' (delete)' : ''}
+          {lines.length > page ? ` · lines ${first + 1}-${first + shown.length} of ${lines.length}` : ''}
         </Text>
-      ))}
-      <Text dimColor>
-        [y] apply · [n] reject · [a] always allow this session
+        {tainted && <Text color="yellow"> · after reading web/MCP content</Text>}
+      </Text>
+      {shown.map((line, idx) =>
+        line.kind === 'meta' ? (
+          <Text key={first + idx} color="cyan" wrap="truncate">
+            {line.text}
+          </Text>
+        ) : (
+          <Text key={first + idx} wrap="truncate">
+            <Text dimColor>
+              {num(line.oldNo)} {num(line.newNo)}{' '}
+            </Text>
+            <Text color={line.kind === 'add' ? 'green' : line.kind === 'del' ? 'red' : 'gray'} dimColor={line.kind === 'ctx'}>
+              {line.kind === 'add' ? '+ ' : line.kind === 'del' ? '- ' : '  '}
+              {showWhitespace(line.text, line.kind !== 'ctx')}
+            </Text>
+          </Text>
+        ),
+      )}
+      <Text dimColor wrap="truncate">
+        {lines.length > page ? '[↑↓ pgup/pgdn home/end] scroll · ' : ''}[y] apply · [n] reject · [shift+a] always allow this session
       </Text>
     </Box>
   )
-}
-
-function fileLines(content: string | null): string[] {
-  if (content === null || content === '') return []
-  const lines = content.split(/\r?\n/)
-  if (lines.at(-1) === '') lines.pop()
-  return lines
 }
