@@ -1,8 +1,11 @@
 import readline from 'node:readline/promises'
-import { PROVIDER_PRESETS, getPreset } from '@hesdor/providers'
+import { CHATGPT_USAGE_URL, PROVIDER_PRESETS, getPreset } from '@hesdor/providers'
+import { chooseChatGPTModel, loginChatGPT } from './chatgpt-login.js'
 import type { ProviderKind, ProviderPreset } from '@hesdor/providers'
-import { saveCredential } from './auth.js'
-import { loadConfig, saveConfig } from './config.js'
+import { loadAuth, saveCredential } from './auth.js'
+import type { CliFlags } from './args.js'
+import { loadConfig, modelIdError, savedModel, saveConfig } from './config.js'
+import { customEnvKey, presetEnvKeys, resolveSelection } from './provider-setup.js'
 
 const DIM = '\x1b[2m'
 const BOLD = '\x1b[1m'
@@ -39,7 +42,8 @@ export async function runSetup(): Promise<number> {
     return answer
   }
 
-  const askSecret = async (question: string): Promise<string> => {
+  /** null: the user pressed Ctrl+C or Ctrl+D (abort without saving). */
+  const askSecret = async (question: string): Promise<string | null> => {
     if (!rl) {
       const answer = scripted[scriptIdx] ?? ''
       scriptIdx++
@@ -50,12 +54,13 @@ export async function runSetup(): Promise<number> {
     rl = undefined
     const answer = await readHiddenLine(question)
     rl = readline.createInterface({ input: process.stdin, output: process.stdout })
-    return answer.trim()
+    return answer === null ? null : answer.trim()
   }
 
   try {
     console.log(`${BOLD}Hesdor setup${RESET}`)
     console.log('Pick an AI provider:\n')
+    console.log(`   c)  Continue with ChatGPT  ${DIM}use your ChatGPT plan · browser sign-in, no API key${RESET}\n`)
 
     for (let i = 0; i < PROVIDER_PRESETS.length; i++) {
       const p = PROVIDER_PRESETS[i]!
@@ -87,15 +92,19 @@ export async function runSetup(): Promise<number> {
             customKind = 'openai'
             break
           }
+          if (format === 'openai-responses' || format === 'responses') {
+            customKind = 'openai-responses'
+            break
+          }
           if (format === 'anthropic' || format === 'anthropic-compatible') {
             customKind = 'anthropic'
             break
           }
-          console.log('Format must be openai or anthropic.')
+          console.log('Format must be openai, openai-responses or anthropic.')
         }
         break
       }
-      providerId = byNumber ?? answer
+      providerId = byNumber ?? (answer === 'c' ? 'chatgpt' : answer)
       preset = getPreset(providerId)
       if (preset) break
       console.log('Not a valid provider — try again.')
@@ -124,15 +133,38 @@ export async function runSetup(): Promise<number> {
       }
     }
 
-    const envKey = preset?.envKey ?? (customKind ? 'HESDOR_CUSTOM_API_KEY' : undefined)
+    const envKey = preset
+      ? (presetEnvKeys(preset).find((k) => process.env[k]) ?? preset.envKey)
+      : customKind
+        ? customEnvKey(providerId, false)
+        : undefined
     const envValue = envKey ? process.env[envKey] : undefined
-    if (envValue) {
+    let chatgptModel: string | undefined
+    if (providerId === 'chatgpt') {
+      // No API key: OpenAI's official ChatGPT plan sign-in in the browser.
+      try {
+        const { record, models } = await loginChatGPT()
+        console.log(`✓ signed in to ChatGPT${record.email ? ` as ${record.email}` : ''}. You're using your ChatGPT plan (manage usage: ${CHATGPT_USAGE_URL})`)
+        chatgptModel = await chooseChatGPTModel(models)
+      } catch (err) {
+        console.log(`✗ ${err instanceof Error ? err.message : String(err)}`)
+        return 1
+      }
+    } else if (envValue) {
       console.log(`✓ ${envKey} already set in your environment — using it.`)
     } else {
       const required = preset?.requiresApiKey ?? false
-      const hint = required ? 'REQUIRED' : 'optional — leave empty if your endpoint needs none'
+      // CLI-26: re-running setup must not force re-entering a stored key.
+      const stored = Boolean((await loadAuth())[providerId])
+      const hint = stored ? 'Enter keeps the saved key' : required ? 'REQUIRED' : 'optional — leave empty if your endpoint needs none'
       const key = await askSecret(`API key (${hint}): `)
-      if (key === '' && required) {
+      if (key === null) {
+        console.log('Setup cancelled — nothing was saved.')
+        return 130
+      }
+      if (key === '' && stored) {
+        console.log('✓ keeping the saved key')
+      } else if (key === '' && required) {
         console.log('No key entered. Re-run `hesdor setup` later.')
         return 1
       }
@@ -142,9 +174,15 @@ export async function runSetup(): Promise<number> {
       }
     }
 
-    const keepModel = cfg.provider === providerId ? cfg.model : undefined
-    const defaultModel = keepModel ?? preset?.defaultModel ?? 'local-model'
-    const model = (await ask(`Default model [${defaultModel}]: `)) || defaultModel
+    const defaultModel = chatgptModel ?? savedModel(cfg, providerId, false) ?? preset?.defaultModel ?? 'local-model'
+    let model = defaultModel
+    for (;;) {
+      model = (await ask(`Default model [${defaultModel}]: `)) || defaultModel
+      const problem = modelIdError(model)
+      if (!problem) break
+      console.log(problem)
+      if (!rl) return 1
+    }
 
     await saveConfig({ provider: providerId, model })
     console.log(`\n✓ provider: ${providerId}`)
@@ -175,9 +213,10 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function readHiddenLine(question: string): Promise<string> {
+/** Reads a line without echo; null when Ctrl+C or Ctrl+D aborts it (CLI-25: never save a partial key). */
+function readHiddenLine(question: string): Promise<string | null> {
   const input = process.stdin
-  if (!input.setRawMode) return new Promise((resolve) => resolve(''))
+  if (!input.setRawMode) return Promise.resolve('')
 
   process.stdout.write(question)
   const wasRaw = input.isRaw ?? false
@@ -186,16 +225,20 @@ function readHiddenLine(question: string): Promise<string> {
 
   return new Promise((resolve) => {
     let value = ''
-    const finish = (): void => {
+    const finish = (result: string | null): void => {
       input.off('data', onData)
       input.setRawMode?.(wasRaw)
       process.stdout.write('\n')
-      resolve(value)
+      resolve(result)
     }
     const onData = (chunk: Buffer | string): void => {
       for (const char of chunk.toString()) {
-        if (char === '\r' || char === '\n' || char === '\u0004' || char === '\u0003') {
-          finish()
+        if (char === '\u0004' || char === '\u0003') {
+          finish(null)
+          return
+        }
+        if (char === '\r' || char === '\n') {
+          finish(value)
           return
         }
         if (char === '\u007f' || char === '\b') value = value.slice(0, -1)
@@ -226,14 +269,26 @@ export async function runProviderCommand(value: string): Promise<number> {
   return 0
 }
 
-/** `hesdor model [<id>]` — show or persist the default model. */
-export async function runModelCommand(value: string): Promise<number> {
+/** `hesdor model [<id>]` — show or persist the default model for the current provider. */
+export async function runModelCommand(value: string, flags?: CliFlags): Promise<number> {
+  const cfg = await loadConfig()
+  let providerId: string
+  try {
+    providerId = (await resolveSelection({ yes: false, debug: false, force: false, version: false, help: false, ...flags, model: undefined }, cfg)).providerId
+  } catch (err) {
+    console.error(`✗ ${err instanceof Error ? err.message : String(err)}`)
+    return 1
+  }
   if (value === '') {
-    const cfg = await loadConfig()
-    console.log(cfg.model ?? 'no default model set (provider default applies)')
+    console.log(savedModel(cfg, providerId, !flags?.provider) ?? `no default model set for ${providerId} (provider default applies)`)
     return 0
   }
-  await saveConfig({ model: value })
-  console.log(`✓ default model set to ${value}`)
+  const problem = modelIdError(value)
+  if (problem) {
+    console.error(`✗ ${problem}`)
+    return 1
+  }
+  await saveConfig({ models: { ...cfg.models, [providerId]: value } })
+  console.log(`✓ default model for ${providerId} set to ${value}`)
   return 0
 }
