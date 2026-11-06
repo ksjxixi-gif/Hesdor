@@ -11,7 +11,11 @@ export async function* sseData(res: Response): AsyncGenerator<string> {
   let buffer = ''
   try {
     for (;;) {
-      const { done, value } = await reader.read()
+      const { done, value } = await reader.read().catch((err: unknown) => {
+        if (err instanceof Error && err.name === 'AbortError') throw err
+        // undici reports a dropped socket as "terminated"; make it a classified, retryable error.
+        throw new ProviderError(`stream interrupted: ${err instanceof Error ? err.message : String(err)}`, { kind: 'network' })
+      })
       if (done) break
       buffer += decoder.decode(value, { stream: true })
       let nl = buffer.indexOf('\n')
