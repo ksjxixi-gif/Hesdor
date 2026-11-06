@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { listSessions, loadSession, newSessionId, saveSession, titleFrom } from './sessions.js'
 
 const repo = mkdtempSync(path.join(tmpdir(), 'hesdor-sessions-'))
+// Keep transcripts out of the developer's real profile (each test file runs in its own worker).
+process.env.APPDATA = process.env.XDG_CONFIG_HOME = mkdtempSync(path.join(tmpdir(), 'hesdor-home-'))
 
 describe('sessions', () => {
   it('saves, lists newest-first and loads transcripts', async () => {
@@ -63,5 +65,43 @@ describe('titleFrom', () => {
   it('uses the first user message, collapsed and capped', () => {
     expect(titleFrom([{ role: 'user', content: 'hello\n  world  this is long'.repeat(5) }]).length).toBeLessThanOrEqual(61)
     expect(titleFrom([])).toBe('(untitled)')
+  })
+})
+
+describe('session index, resume and linked ids', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'hesdor-index-'))
+
+  it('keeps an index, finds sessions by id or prefix, and records parent links', async () => {
+    const { findSession } = await import('./sessions.js')
+    await expect(findSession(root)).rejects.toThrow(/no saved session/)
+    const parent = newSessionId()
+    await saveSession(root, { id: parent, title: 'parent', messages: [{ role: 'user', content: 'parent' }] })
+    await new Promise((r) => setTimeout(r, 5))
+    const child = `zz${newSessionId()}`
+    await saveSession(root, { id: child, title: 'child', parentId: parent, messages: [{ role: 'user', content: 'summary' }] })
+
+    const metas = await listSessions(root)
+    expect(metas.map((m) => m.id)).toEqual([child, parent])
+    expect(metas[0]).toMatchObject({ parentId: parent, messageCount: 1 })
+
+    expect((await findSession(root)).id).toBe(child)
+    expect((await findSession(root, 'zz')).id).toBe(child)
+    expect((await findSession(root, parent)).messages[0]!.content).toBe('parent')
+    await expect(findSession(root, '../x')).rejects.toThrow(/invalid session id/)
+    await expect(findSession(root, 'nope')).rejects.toThrow(/no session/)
+
+    // Saving again keeps createdAt and the parent link; the index stays one entry per id.
+    const before = metas[0]!.createdAt
+    await saveSession(root, { id: child, title: 'child', messages: [{ role: 'user', content: 'summary' }, { role: 'assistant', content: 'ok' }] })
+    const after = await listSessions(root)
+    expect(after).toHaveLength(2)
+    expect(after[0]).toMatchObject({ id: child, createdAt: before, parentId: parent, messageCount: 2 })
+  })
+
+  it('rebuilds a missing index from the transcripts', async () => {
+    const { rm } = await import('node:fs/promises')
+    const dir = path.dirname((await listSessions(root))[0]!.file)
+    await rm(path.join(dir, 'index.json'))
+    expect((await listSessions(root)).map((m) => m.title).sort()).toEqual(['child', 'parent'])
   })
 })
