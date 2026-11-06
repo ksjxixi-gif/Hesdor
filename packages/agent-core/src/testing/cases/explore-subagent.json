@@ -1,0 +1,38 @@
+{
+  "name": "explore-subagent",
+  "description": "The main agent delegates to the read-only explore subagent and uses its answer. Requests interleave: main, sub, sub, main.",
+  "interactions": [
+    {
+      "note": "main: delegate",
+      "match": { "role": "user", "contains": ["Where is greet defined?"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c1", "name": "explore", "argumentsDelta": "{\"task\":\"find where greet is defined\"}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "note": "subagent: search",
+      "match": { "role": "user", "contains": ["find where greet is defined"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "s1", "name": "search_files", "argumentsDelta": "{\"pattern\":\"function greet\"}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "note": "subagent: answer",
+      "match": { "role": "tool_result", "toolCallId": "s1", "contains": ["app.ts"] },
+      "chunks": [
+        { "type": "text", "text": "greet is defined in src/app.ts on line 1." },
+        { "type": "finish", "reason": "stop" }
+      ]
+    },
+    {
+      "note": "main: final answer",
+      "match": { "role": "tool_result", "toolCallId": "c1", "contains": ["src/app.ts on line 1"] },
+      "chunks": [
+        { "type": "text", "text": "It is in src/app.ts, line 1." },
+        { "type": "finish", "reason": "stop" }
+      ]
+    }
+  ]
+}
