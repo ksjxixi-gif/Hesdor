@@ -1,0 +1,63 @@
+name: Release
+
+# Push a tag like v0.2.0 (matching packages/cli/package.json) to publish.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write # create the GitHub release
+  id-token: write # npm trusted publishing (OIDC); provenance is added automatically
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest # trusted publishing needs a GitHub-hosted runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm >= 11.5.1.
+      - run: npm install -g npm@^11.5.1
+
+      - name: Check the tag matches the CLI version
+        run: |
+          version=$(node -p "require('./packages/cli/package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match packages/cli version $version"
+            exit 1
+          fi
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+      # pnpm pack runs prepack (builds every workspace package) and rewrites workspace: ranges.
+      - name: Pack the CLI
+        working-directory: packages/cli
+        run: pnpm pack --pack-destination "$RUNNER_TEMP"
+
+      - name: Smoke test the bundled CLI
+        run: |
+          test "$(node packages/cli/bin/hesdor.js --version)" = "hesdor ${GITHUB_REF_NAME#v}"
+          node packages/cli/bin/hesdor.js --help > /dev/null
+
+      - name: Publish to npm
+        run: npm publish "$RUNNER_TEMP"/*.tgz --access public
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          # Section of CHANGELOG.md under "## [x.y.z] ..." up to the next "## [" heading, minus link references.
+          awk -v v="$version" '/^## \[/ { if (on) exit; on = index($0, "## [" v "]") == 1; next } /^\[[^]]*\]: / { next } on' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if [ -s "$RUNNER_TEMP/notes.md" ]; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
