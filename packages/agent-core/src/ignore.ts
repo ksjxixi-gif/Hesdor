@@ -11,8 +11,9 @@ interface CompiledPattern {
 
 /**
  * Pragmatic gitignore subset: comments, `!` negation, trailing-`/` directory
- * patterns, `*`, `?`, `[...]` classes and `**`. Anchoring follows git rules
- * (a slash anywhere except the end anchors the pattern to the root).
+ * patterns, `*`, `?`, `[...]`/`[!...]` classes, `\` escapes and `**`. Anchoring
+ * follows git rules (a slash anywhere except the end anchors the pattern to the root).
+ * shortcut: only the root .gitignore is read, not nested ones; add them if users ask.
  */
 export class GitIgnoreMatcher {
   private readonly patterns: CompiledPattern[]
@@ -44,13 +45,13 @@ export class GitIgnoreMatcher {
   }
 
   private matchesPattern(p: CompiledPattern, relPath: string, isDir: boolean): boolean {
-    if (p.anchored) return p.regex.test(relPath)
-    // Unanchored patterns match at any depth: test every path segment.
+    // Test every ancestor too: a match on a parent directory ignores everything under it.
     const segs = relPath.split('/')
     for (let i = 0; i < segs.length; i++) {
       const isLast = i === segs.length - 1
       if (p.dirOnly && isLast && !isDir) continue
-      if (p.regex.test(segs[i]!)) return true
+      // Anchored patterns match the path from the root; unanchored ones match one segment at any depth.
+      if (p.regex.test(p.anchored ? segs.slice(0, i + 1).join('/') : segs[i]!)) return true
     }
     return false
   }
@@ -85,11 +86,18 @@ function parseLine(raw: string): CompiledPattern | undefined {
   return { negated, dirOnly, anchored, regex: globToRegex(line) }
 }
 
-function globToRegex(glob: string): RegExp {
+/**
+ * Compile a glob: `*`, `?`, `**`, `[...]`/`[!...]` classes and `\` escapes.
+ * `braces` also expands `{a,b}` alternatives (find_files; gitignore treats `{` literally).
+ */
+export function globToRegex(glob: string, braces = false): RegExp {
   let re = ''
+  let inBraces = false
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i]!
-    if (c === '*') {
+    if (c === '\\' && i + 1 < glob.length) {
+      re += escapeRegex(glob[++i]!)
+    } else if (c === '*') {
       if (glob[i + 1] === '*') {
         if (glob[i + 2] === '/') {
           re += '(?:.*/)?'
@@ -104,19 +112,31 @@ function globToRegex(glob: string): RegExp {
     } else if (c === '?') {
       re += '[^/]'
     } else if (c === '[') {
-      const end = glob.indexOf(']', i + 1)
+      const end = glob.indexOf(']', i + 2) // a `]` right after `[` (or `[!`) is a member, not the end
       if (end > i + 1) {
-        re += glob.slice(i, end + 1)
+        let body = glob.slice(i + 1, end).replace(/\\/g, '\\\\')
+        if (body.startsWith('!')) body = `^/${body.slice(1)}`
+        re += `[${body}]`
         i = end
       } else {
         re += '\\['
       }
+    } else if (braces && c === '{' && !inBraces && glob.indexOf('}', i) > i) {
+      inBraces = true
+      re += '(?:'
+    } else if (braces && inBraces && c === ',') {
+      re += '|'
+    } else if (braces && inBraces && c === '}') {
+      inBraces = false
+      re += ')'
     } else {
-      re += c.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      re += escapeRegex(c)
     }
   }
   return new RegExp(`^${re}$`)
 }
+
+const escapeRegex = (c: string): string => c.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')
 
 /** Convenience helper used by tools that walk the tree. */
 export function relFrom(root: string, abs: string): string {
