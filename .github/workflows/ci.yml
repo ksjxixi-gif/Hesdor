@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.os }} / node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]
+    steps:
+      # Windows users usually have autocrlf on; test with it so CRLF bugs show up here first.
+      - if: runner.os == 'Windows'
+        run: git config --global core.autocrlf true
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+      - name: Smoke test the bundled CLI
+        shell: bash
+        run: |
+          node packages/cli/bin/hesdor.js --version
+          node packages/cli/bin/hesdor.js --help
+          # doctor exits 1 when it finds issues (no API key on CI); only a crash should fail the job
+          node packages/cli/bin/hesdor.js doctor || [ $? -eq 1 ]
