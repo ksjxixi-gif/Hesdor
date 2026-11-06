@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "jsx": "react-jsx",
+    "paths": {
+      "@hesdor/protocol": ["./packages/protocol/src/index.ts"],
+      "@hesdor/providers": ["./packages/providers/src/index.ts"],
+      "@hesdor/agent-core": ["./packages/agent-core/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src", "vitest.config.ts"]
+}
