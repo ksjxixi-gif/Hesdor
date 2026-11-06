@@ -1,0 +1,20 @@
+{
+  "name": "plan-mode-write",
+  "description": "In plan mode a write is refused by the runtime; the model answers with a plan instead.",
+  "interactions": [
+    {
+      "match": { "role": "user" },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c1", "name": "write_file", "argumentsDelta": "{\"path\":\"PLAN.md\",\"content\":\"# plan\\n\"}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c1", "contains": ["permission denied", "plan mode"] },
+      "chunks": [
+        { "type": "text", "text": "Plan: 1. rename greet. 2. update callers." },
+        { "type": "finish", "reason": "stop" }
+      ]
+    }
+  ]
+}
