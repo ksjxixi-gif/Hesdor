@@ -10,5 +10,6 @@ hesdor
 ```
 
 The published CLI bundles the internal Hesdor runtime, so users only need the
-single CLI package. The executable is still `hesdor`. From this repository, build
-first and publish the CLI.
+single CLI package. The executable is `hesdor`.
+
+Source, issues and changelog: https://github.com/ksjxixi-gif/Hesdor. MIT licensed.
