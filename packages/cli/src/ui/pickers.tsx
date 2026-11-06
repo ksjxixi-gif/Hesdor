@@ -39,7 +39,7 @@ export function ListPicker({ title, items, loading, error, onPick, onClose }: Li
 
   useInput((_ch, key) => {
     if (key.upArrow) setSel((s) => Math.max(0, s - 1))
-    else if (key.downArrow) setSel((s) => Math.min(filtered.length - 1, s + 1))
+    else if (key.downArrow) setSel((s) => Math.max(0, Math.min(filtered.length - 1, s + 1)))
     else if (key.escape || key.tab) onClose()
     else if (key.return) {
       const item = filtered[sel]
@@ -71,12 +71,12 @@ export function ListPicker({ title, items, loading, error, onPick, onClose }: Li
                 <Text color="cyan" bold>
                   › {item.label}
                 </Text>
-                {item.hint && <Text dimColor>{item.hint}</Text>}
+                {item.hint && <Text dimColor wrap="truncate">{item.hint}</Text>}
               </Box>
             ) : (
               <Box key={item.value} columnGap={1}>
                 <Text> {item.label}</Text>
-                {item.hint && <Text dimColor>{item.hint}</Text>}
+                {item.hint && <Text dimColor wrap="truncate">{item.hint}</Text>}
               </Box>
             ),
           )}
