@@ -1,4 +1,6 @@
+import { realpathSync } from 'node:fs'
 import path from 'node:path'
+import { PermissionDeniedError } from './policy.js'
 
 export class PathSafetyError extends Error {
   readonly input: string
@@ -26,7 +28,40 @@ export function safeResolve(root: string, input: string): string {
   }
   const abs = path.resolve(root, input)
   if (!isInside(root, abs)) throw new PathSafetyError(input)
+  // Lexically inside is not enough: a symlink or junction in the repo can point anywhere.
+  if (!isInside(realPathOf(root), realPathOf(abs))) throw new PathSafetyError(input)
   return abs
+}
+
+/**
+ * Real path of `p`, following symlinks and junctions on its longest existing
+ * prefix (the rest may not exist yet, e.g. a file about to be created).
+ * shortcut: checked before the operation, so a link swapped in between can still race; re-check at write time if that matters.
+ */
+export function realPathOf(p: string): string {
+  const tail: string[] = []
+  let current = path.resolve(p)
+  for (;;) {
+    try {
+      return path.join(realpathSync.native(current), ...tail.reverse())
+    } catch {
+      const parent = path.dirname(current)
+      if (parent === current) return path.resolve(p)
+      tail.push(path.basename(current))
+      current = parent
+    }
+  }
+}
+
+/**
+ * Refuse agent writes to paths that change how git or Hesdor itself behaves
+ * (`.git/hooks` runs on the user's next commit). No approval can unlock these.
+ */
+export function assertWritable(root: string, abs: string): void {
+  const first = toRel(root, abs).split('/')[0]?.toLowerCase()
+  if (first === '.git') {
+    throw new PermissionDeniedError(`refusing to write ${toRel(root, abs)}: the .git directory is off limits, use git commands instead`)
+  }
 }
 
 /** Relative POSIX-style path (for display and gitignore matching). */
