@@ -11,9 +11,12 @@
   "packageManager": "pnpm@11.22.0",
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "tsc -p tsconfig.typecheck.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:replay": "vitest run packages/agent-core/src/testing packages/providers/src/sse-fixtures.test.ts",
+    "bench": "node scripts/bench.mjs",
     "lint": "oxlint packages"
   },
   "devDependencies": {
