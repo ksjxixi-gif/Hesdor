@@ -1,16 +1,36 @@
 import type {
   AgentResult,
+  ChatImage,
   ChatMessage,
   ModelProvider,
   RunEvent,
   ToolCallRequest,
+  Usage,
 } from '@hesdor/protocol'
+import { COMPACT_THRESHOLD, DEFAULT_CONTEXT_WINDOW, estimateTokens, pruneToolResults, summarizeHistory } from './compact.js'
 import type { ToolContext } from './context.js'
+import { createHookDispatcher, hookContextBlock } from './hooks.js'
+import type { HookDispatcher } from './hooks.js'
 import type { LoadedPlugin } from './plugins.js'
 import { assertRiskAllowed, PermissionDeniedError } from './policy.js'
 import type { ToolRegistry } from './registry.js'
+import { capOutput, formatToolResult, selfLimited } from './tool-output.js'
 
-export const DEFAULT_MAX_STEPS = 30
+export const DEFAULT_MAX_STEPS = 100
+export const MAX_ATTEMPTS = 4
+
+const TRUNCATED_CALL =
+  'ERROR: your response hit the max output token limit, so the arguments of this tool call were cut off and it was NOT run. ' +
+  'Split the work into smaller steps: write a smaller file with write_file and add the rest with apply_patch, or edit existing files with apply_patch instead of rewriting them.'
+
+const budgetNotice = (used: number, max: number): string =>
+  `\n\n[notice: ${used} of ${max} tool steps used. Finish the most important part and wrap up soon.]`
+const BUDGET_DONE =
+  '\n\n[the tool step budget is used up, so no more tools will run. Reply now WITHOUT calling tools: summarize what you did, what is still left to do, and anything the user should check.]'
+
+const EDIT_TOOLS = new Set(['write_file', 'apply_patch', 'delete_file'])
+/** Polling the same job with the same arguments is normal, not a loop. */
+const POLLING_TOOLS = new Set(['job_output', 'job_list'])
 
 export interface AgentLoopOptions {
   provider: ModelProvider
@@ -23,12 +43,28 @@ export interface AgentLoopOptions {
   maxSteps?: number
   /** Plugins receive lifecycle hooks around every tool execution. */
   plugins?: LoadedPlugin[]
+  /** Set when this loop is a subagent: hooks see `agent_type` and SubagentStop instead of Stop. */
+  agent?: string
+  /** The model's context window in tokens; history is compacted above 80% of it. Default 128000. */
+  contextWindow?: number
+  /** Images attached to the user prompt (`--image`, pasted or `@`-mentioned files). */
+  images?: ChatImage[]
+  /** Cheaper model for compaction summaries; the main provider is retried when it fails. */
+  compactionProvider?: ModelProvider
 }
 
 interface PendingCall {
   id: string
   name: string
   args: string
+}
+
+interface ModelTurn {
+  text: string
+  reasoning: string
+  providerState: unknown
+  finishReason: string | undefined
+  pending: Map<number, PendingCall>
 }
 
 /**
@@ -41,6 +77,7 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
   const { provider, registry } = opts
   const plugins = opts.plugins ?? []
   const maxSteps = opts.maxSteps ?? DEFAULT_MAX_STEPS
+  const contextWindow = opts.contextWindow ?? DEFAULT_CONTEXT_WINDOW
 
   // Fan every event out to plugin `event` hooks without changing the host's emit.
   const baseCtx: ToolContext = {
@@ -57,16 +94,170 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
     },
   }
   const ctx = baseCtx
+  const hooks = createHookDispatcher(plugins, { cwd: ctx.root, signal: ctx.signal, mode: ctx.mode, emit: ctx.emit, ...(opts.agent ? { agent: opts.agent } : {}) })
+  let stopHookActive = false
 
-  const messages: ChatMessage[] = [
+  // Reassigned when the history is compacted.
+  let messages: ChatMessage[] = [
     { role: 'system', content: opts.systemPrompt },
     ...(opts.history ?? []),
-    { role: 'user', content: opts.userPrompt },
+    { role: 'user', content: opts.userPrompt, ...(opts.images?.length ? { images: opts.images } : {}) },
   ]
-  const finish = (result: Omit<AgentResult, 'messages'>): AgentResult => ({ ...result, messages })
+  let compacted = false
+  const finish = (result: Omit<AgentResult, 'messages'>): AgentResult => ({
+    ...result,
+    messages,
+    ...(compacted ? { compacted } : {}),
+  })
 
   let steps = 0
-  let usageTotal: { inputTokens?: number; outputTokens?: number; totalTokens?: number; ready?: boolean } | undefined
+  let usageTotal: Usage | undefined
+  const addUsage = (usage: Usage | undefined): void => {
+    if (!usage?.ready) return
+    usageTotal = {
+      totalTokens: (usageTotal?.totalTokens ?? 0) + (usage.totalTokens ?? 0),
+      inputTokens: (usageTotal?.inputTokens ?? 0) + (usage.inputTokens ?? 0),
+      outputTokens: (usageTotal?.outputTokens ?? 0) + (usage.outputTokens ?? 0),
+      cacheReadTokens: addOptional(usageTotal?.cacheReadTokens, usage.cacheReadTokens),
+      cacheWriteTokens: addOptional(usageTotal?.cacheWriteTokens, usage.cacheWriteTokens),
+      ready: true,
+    }
+  }
+
+  // Prompt tokens of the last request as the provider counted them, and how many messages it held.
+  let lastInput: { tokens: number; count: number } | undefined
+  const specTokens = (): number => Math.ceil(JSON.stringify(registry.specs()).length / 4)
+  const contextTokens = (): number =>
+    lastInput
+      ? lastInput.tokens + estimateTokens(messages.slice(lastInput.count))
+      : estimateTokens(messages) + specTokens()
+
+  /** Prune old tool outputs, then summarize if still too big. `force` after a context overflow error. */
+  const compact = async (force: boolean): Promise<boolean> => {
+    const threshold = contextWindow * COMPACT_THRESHOLD
+    const before = contextTokens()
+    if (!force && before <= threshold) return false
+    const pruned = pruneToolResults(messages)
+    let next = pruned.messages
+    let phase: 'prune' | 'summary' = 'prune'
+    if (force || estimateTokens(next) + specTokens() > threshold) {
+      try {
+        const summarize = (p: ModelProvider) =>
+          summarizeHistory(p, next, {
+            signal: ctx.signal,
+            recentBudget: Math.floor(contextWindow * 0.3),
+            maxInputTokens: Math.floor(contextWindow * 0.5),
+          })
+        // The small model may fail (or have a smaller window); the main model is the fallback.
+        const summary = opts.compactionProvider
+          ? await summarize(opts.compactionProvider).catch((err: unknown) => {
+              if (isAbortError(err) || ctx.signal.aborted) throw err
+              return summarize(provider)
+            })
+          : await summarize(provider)
+        if (summary) {
+          next = summary.messages
+          phase = 'summary'
+          compacted = true
+          addUsage(summary.usage)
+        }
+      } catch (err) {
+        if (isAbortError(err) || ctx.signal.aborted) throw abortError()
+        // A failed summary keeps the pruned history; the next request shows whether it fits.
+      }
+    }
+    if (phase === 'prune' && pruned.pruned === 0) return false
+    messages = next
+    lastInput = undefined
+    ctx.emit({ type: 'context.compacted', phase, beforeTokens: before, afterTokens: contextTokens() })
+    return true
+  }
+
+  const callModel = async (): Promise<ModelTurn> => {
+    let overflowHandled = false
+    // Retry only while nothing has been yielded, so streamed output is never duplicated.
+    for (let attempt = 1; ; attempt++) {
+      const turn: ModelTurn = { text: '', reasoning: '', providerState: undefined, finishReason: undefined, pending: new Map() }
+      const count = messages.length
+      let inputTokens: number | undefined
+      let yielded = false
+      try {
+        for await (const chunk of provider.stream(messages, registry.specs(), ctx.signal)) {
+          yielded = true
+          if (chunk.type === 'finish') {
+            turn.finishReason = chunk.reason
+            if (chunk.usage?.inputTokens) inputTokens = chunk.usage.inputTokens
+          }
+          if (chunk.type === 'text') {
+            turn.text += chunk.text
+            ctx.emit({ type: 'assistant.delta', text: chunk.text })
+          } else if (chunk.type === 'reasoning') {
+            turn.reasoning += chunk.text
+            ctx.emit({ type: 'assistant.reasoning', text: chunk.text })
+          } else if (chunk.type === 'provider_state') {
+            turn.providerState = chunk.state
+          } else if (chunk.type === 'tool_call') {
+            const acc = turn.pending.get(chunk.index) ?? { id: '', name: '', args: '' }
+            if (chunk.id) acc.id = chunk.id
+            if (chunk.name) acc.name = chunk.name
+            acc.args += chunk.argumentsDelta
+            turn.pending.set(chunk.index, acc)
+          } else if (chunk.type === 'finish') {
+            addUsage(chunk.usage)
+          }
+          // Loop ends when the stream does.
+        }
+        lastInput = inputTokens ? { tokens: inputTokens, count } : undefined
+        return turn
+      } catch (err) {
+        const retry = err as { retryable?: unknown; retryAfterMs?: unknown; kind?: unknown }
+        // Too long for the model: compact once and send again.
+        if (!yielded && retry?.kind === 'context_overflow' && !overflowHandled && !ctx.signal.aborted) {
+          overflowHandled = true
+          if (await compact(true)) continue
+        }
+        if (yielded || attempt >= MAX_ATTEMPTS || retry?.retryable !== true || ctx.signal.aborted) throw err
+        const delayMs =
+          typeof retry.retryAfterMs === 'number'
+            ? retry.retryAfterMs
+            : Math.round(Math.min(1000 * 2 ** (attempt - 1), 30_000) * (0.5 + Math.random() / 2))
+        ctx.emit({ type: 'provider.retry', attempt, maxAttempts: MAX_ATTEMPTS, delayMs, reason: retryReason(retry.kind) })
+        await sleep(delayMs, ctx.signal)
+      }
+    }
+  }
+
+  /** Append a note to the newest tool result, which the model reads next. */
+  const noteOnLastResult = (note: string): boolean => {
+    const last = messages.at(-1)
+    if (last?.role !== 'tool_result') return false
+    messages[messages.length - 1] = { ...last, content: last.content + note }
+    return true
+  }
+
+  // Loop detection: identical calls since the last successful edit, and edits per path.
+  const sameCalls = new Map<string, number>()
+  const editsPerPath = new Map<string, number>()
+  const loopRefusal = (call: ToolCallRequest): string | undefined => {
+    const args = parseArgs(call.argumentsJson)
+    const key = `${call.name}\0${args ? JSON.stringify(args) : call.argumentsJson}`
+    const same = (sameCalls.get(key) ?? 0) + 1
+    sameCalls.set(key, same)
+    if (same >= 3 && !POLLING_TOOLS.has(call.name)) {
+      return `you are looping: this is call #${same} of ${call.name} with identical arguments, and nothing was edited in between, so it was NOT run. Change approach: re-read the relevant code, try a different fix, or tell the user what blocks you.`
+    }
+    const target = asRecord(args).path
+    if (EDIT_TOOLS.has(call.name) && typeof target === 'string') {
+      const edits = (editsPerPath.get(target) ?? 0) + 1
+      editsPerPath.set(target, edits)
+      if (edits === 5) {
+        return `you may be looping: this is edit #5 to ${target} in this run, so it was NOT applied. Step back: re-read the file and the error, then make one complete, correct edit instead of many small ones.`
+      }
+    }
+    return undefined
+  }
+
+  const warnAt = Math.ceil(maxSteps * 0.8)
   ctx.emit({ type: 'run.started', mode: ctx.mode, model: provider.model })
 
   try {
@@ -74,55 +265,93 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
       if (ctx.signal.aborted) throw abortError()
       steps++
 
-      let text = ''
-      const pending = new Map<number, PendingCall>()
-      for await (const chunk of provider.stream(messages, registry.specs(), ctx.signal)) {
-        if (chunk.type === 'text') {
-          text += chunk.text
-          ctx.emit({ type: 'assistant.delta', text: chunk.text })
-        } else if (chunk.type === 'tool_call') {
-          const acc = pending.get(chunk.index) ?? { id: '', name: '', args: '' }
-          if (chunk.id) acc.id = chunk.id
-          if (chunk.name) acc.name = chunk.name
-          acc.args += chunk.argumentsDelta
-          pending.set(chunk.index, acc)
-        } else if (chunk.type === 'finish' && chunk.usage?.ready) {
-          usageTotal = {
-            totalTokens: (usageTotal?.totalTokens ?? 0) + (chunk.usage.totalTokens ?? 0),
-            inputTokens: (usageTotal?.inputTokens ?? 0) + (chunk.usage.inputTokens ?? 0),
-            outputTokens: (usageTotal?.outputTokens ?? 0) + (chunk.usage.outputTokens ?? 0),
-            ready: true,
-          }
-        }
-        // Loop ends when the stream does.
-      }
+      await compact(false)
+      const { text, reasoning, providerState, finishReason, pending } = await callModel()
 
+      const truncated = finishReason === 'length'
+      // Calls whose JSON was cut by the token limit are stored as {} (strict providers reject broken
+      // arguments in history) and answered with TRUNCATED_CALL instead of being run.
+      const cutCalls = new Set<string>()
       const toolCalls: ToolCallRequest[] = [...pending.entries()]
         .sort((a, b) => a[0] - b[0])
-        .map(([index, call], i) => ({
-          id: call.id || `call_${steps}_${i}`,
-          name: call.name || `unknown_tool_${index}`,
-          argumentsJson: call.args,
-        }))
+        .map(([index, call], i) => {
+          const id = call.id || `call_${steps}_${i}`
+          const cut = truncated && !isJson(call.args || '{}')
+          if (cut) cutCalls.add(id)
+          return { id, name: call.name || `unknown_tool_${index}`, argumentsJson: cut ? '{}' : call.args }
+        })
 
-      messages.push({
-        role: 'assistant',
-        content: text,
-        ...(toolCalls.length > 0 ? { toolCalls } : {}),
-      })
+      // An empty assistant turn (a bare end_turn) would make every later request invalid.
+      if (text !== '' || toolCalls.length > 0) {
+        messages.push({
+          role: 'assistant',
+          content: text,
+          ...(toolCalls.length > 0 ? { toolCalls } : {}),
+          ...(reasoning ? { reasoning } : {}),
+          ...(providerState !== undefined ? { providerState } : {}),
+        })
+      }
       ctx.emit({ type: 'assistant.message', content: text, toolCalls })
 
       if (toolCalls.length === 0) {
-        ctx.emit({ type: 'run.completed', steps, ...(usageTotal ? { usage: usageTotal } : {}) })
-        return finish({ status: 'completed', ...(usageTotal ? { usage: usageTotal } : {}) })
+        // A Stop hook may send the model back to work, once per run (no endless loops).
+        const stop = await hooks.stop(text, stopHookActive)
+        if (stop.block !== undefined && !stopHookActive) {
+          stopHookActive = true
+          messages.push({ role: 'user', content: `A stop hook asked you to continue: ${stop.block}` })
+          continue
+        }
+        const extra = { ...(usageTotal ? { usage: usageTotal } : {}), ...(truncated ? { truncated } : {}) }
+        ctx.emit({ type: 'run.completed', steps, ...extra })
+        return finish({ status: 'completed', ...extra })
       }
 
       for (const call of toolCalls) {
-        const resultMessage = await executeCall(call, registry, ctx, plugins)
+        if (ctx.signal.aborted) {
+          // Every tool call needs a result or the history is invalid on resume.
+          for (const skipped of toolCalls.slice(toolCalls.indexOf(call))) {
+            messages.push({ role: 'tool_result', toolCallId: skipped.id, content: 'cancelled by the user before it ran', isError: true })
+          }
+          throw abortError()
+        }
+        if (cutCalls.has(call.id)) {
+          ctx.emit({ type: 'tool.failed', callId: call.id, name: call.name, error: 'arguments cut off by the max output token limit' })
+          messages.push({ role: 'tool_result', toolCallId: call.id, content: TRUNCATED_CALL, isError: true })
+          continue
+        }
+        const refusal = loopRefusal(call)
+        if (refusal) {
+          ctx.emit({ type: 'tool.failed', callId: call.id, name: call.name, error: 'refused: the agent is repeating itself' })
+          messages.push({ role: 'tool_result', toolCallId: call.id, content: `ERROR: ${refusal}`, isError: true })
+          continue
+        }
+        const resultMessage = await executeCall(call, registry, ctx, hooks)
+        if (EDIT_TOOLS.has(call.name) && !resultMessage.isError) sameCalls.clear() // re-running tests after an edit is not a loop
         messages.push(resultMessage)
       }
+      if (steps === warnAt && warnAt < maxSteps) noteOnLastResult(budgetNotice(steps, maxSteps))
     }
 
+    // Budget used up: one last call so the run ends with a summary instead of a dangling tool call.
+    if (noteOnLastResult(BUDGET_DONE)) {
+      try {
+        // Tools stay in the request, which keeps it valid with tool calls in the history (and cached);
+        // calls the model makes anyway are dropped.
+        const final = await callModel()
+        if (final.text !== '') {
+          messages.push({
+            role: 'assistant',
+            content: final.text,
+            ...(final.reasoning ? { reasoning: final.reasoning } : {}),
+            ...(final.providerState !== undefined && final.pending.size === 0 ? { providerState: final.providerState } : {}),
+          })
+        }
+        ctx.emit({ type: 'assistant.message', content: final.text, toolCalls: [] })
+      } catch (err) {
+        if (isAbortError(err)) throw err
+        // The budget stop stays the result; the summary is a courtesy.
+      }
+    }
     ctx.emit({ type: 'run.completed', steps, ...(usageTotal ? { usage: usageTotal } : {}) })
     return finish({ status: 'max_steps', ...(usageTotal ? { usage: usageTotal } : {}) })
   } catch (err) {
@@ -140,7 +369,7 @@ async function executeCall(
   call: ToolCallRequest,
   registry: ToolRegistry,
   ctx: ToolContext,
-  plugins: LoadedPlugin[],
+  hooks: HookDispatcher,
 ): Promise<ChatMessage> {
   const fail = (error: string): ChatMessage => {
     ctx.emit({ type: 'tool.failed', callId: call.id, name: call.name, error })
@@ -159,40 +388,43 @@ async function executeCall(
     return fail(`arguments are not valid JSON`)
   }
 
-  let input: unknown = rawInput
-  if ('schema' in tool && tool.schema) {
-    const parsed = tool.schema.safeParse(rawInput)
-    if (!parsed.success) {
-      const issues = parsed.error.issues
-        .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
-        .join('; ')
-      return fail(`invalid arguments for "${call.name}" — ${issues}`)
-    }
-    input = parsed.data
+  // Validates the model's arguments, and again any input a plugin or hook rewrote (L17).
+  const validate = (value: unknown, what: string): { ok: true; value: unknown } | { ok: false; error: string } => {
+    if (!('schema' in tool) || !tool.schema) return { ok: true, value }
+    const parsed = tool.schema.safeParse(value)
+    if (parsed.success) return { ok: true, value: parsed.data }
+    const issues = parsed.error.issues.map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`).join('; ')
+    return { ok: false, error: `invalid ${what} for "${call.name}" — ${issues}` }
   }
+  const checked = validate(rawInput, 'arguments')
+  if (!checked.ok) return fail(checked.error)
+  let input = checked.value
+  let hookContext: string[] = []
 
   try {
     assertRiskAllowed(ctx.mode, tool.name, tool.risk)
 
-    for (const plugin of plugins) {
-      const hook = plugin.hooks['tool.execute.before']
-      if (!hook) continue
-      const outcome = await hook({ tool: tool.name, input })
-      if (outcome?.deny) {
-        throw new PermissionDeniedError(`blocked by plugin "${plugin.name}": ${outcome.deny}`)
-      }
-      if (outcome && 'input' in outcome && outcome.input !== undefined) {
-        input = outcome.input
-      }
+    // JS plugin before-hooks, then PreToolUse command hooks.
+    const pre = await hooks.preToolUse(tool.name, input, call.id)
+    if (pre.block !== undefined) throw new PermissionDeniedError(pre.block)
+    if (pre.updatedInput !== undefined) {
+      const rewritten = validate(pre.updatedInput, 'hook-modified arguments')
+      if (!rewritten.ok) return fail(rewritten.error)
+      input = rewritten.value
+    }
+    if (pre.ask !== undefined) {
+      const title = `A hook asks you to approve ${describeCall({ ...call, argumentsJson: JSON.stringify(input) })}`
+      const approved = ctx.approvalsEnabled && (await ctx.requestApproval({ title, ...(pre.ask ? { detail: pre.ask } : {}) }))
+      if (!approved) throw new PermissionDeniedError(`denied: a hook asked for approval and it was not given${pre.ask ? ` (${pre.ask})` : ''}`)
     }
 
-    const result = await tool.execute(input as never, ctx)
-
-    for (const plugin of plugins) {
-      void Promise.resolve()
-        .then(() => plugin.hooks['tool.execute.after']?.({ tool: tool.name, input, result }))
-        .catch(() => {})
-    }
+    // Taint (roadmap C7): once web or MCP output is in the conversation, approval prompts say so.
+    const toolCtx: ToolContext = ctx.state.tainted
+      ? { ...ctx, requestApproval: (req) => ctx.requestApproval({ ...req, title: `${req.title} (after reading web/MCP content)` }) }
+      : ctx
+    const result = await tool.execute(input as never, toolCtx)
+    if (tool.risk === 'NETWORK') ctx.state.tainted = true
+    hookContext = [...pre.context, ...(await hooks.postToolUse(tool.name, input, call.id, { result })).context]
 
     ctx.emit({
       type: 'tool.completed',
@@ -200,15 +432,20 @@ async function executeCall(
       name: tool.name,
       summary: describeDone(tool.name, asRecord(input)),
     })
-    return { role: 'tool_result', toolCallId: call.id, content: stringifyResult(result), isError: false }
+    const content = await resultText(tool.name, result, ctx.root, call.id)
+    // A result's `image` (read_file on an image for a vision model) goes to the model as an image.
+    const image = asRecord(result).image as ChatImage | undefined
+    return {
+      role: 'tool_result',
+      toolCallId: call.id,
+      content: hookContext.length > 0 ? `${content}\n${hookContextBlock(hookContext)}` : content,
+      isError: false,
+      ...(typeof image?.mediaType === 'string' && typeof image.data === 'string' ? { images: [image] } : {}),
+    }
   } catch (err) {
     if (isAbortError(err)) throw err
     const message = err instanceof Error ? err.message : String(err)
-    for (const plugin of plugins) {
-      void Promise.resolve()
-        .then(() => plugin.hooks['tool.execute.after']?.({ tool: tool.name, input, error: message }))
-        .catch(() => {})
-    }
+    void hooks.postToolUse(tool.name, input, call.id, { error: message })
     return fail(message)
   }
 }
@@ -219,17 +456,23 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {}
 }
 
-function stringifyResult(result: unknown): string {
-  let json: string
+/** Plain text for the model; long output keeps its head and tail and is spilled to .hesdor/out. */
+async function resultText(name: string, result: unknown, root: string, callId: string): Promise<string> {
+  let text: string
   try {
-    json = JSON.stringify(result, null, 1) ?? String(result)
+    text = formatToolResult(name, result)
   } catch {
-    json = String(result)
+    text = String(result) // e.g. a circular object from an MCP tool
   }
-  if (json.length > 24_000) {
-    json = `${json.slice(0, 24_000)}\n... (truncated)`
+  return selfLimited(name) ? text : capOutput(text, root, callId)
+}
+
+function parseArgs(json: string): unknown {
+  try {
+    return JSON.parse(json || '{}')
+  } catch {
+    return undefined
   }
-  return json
 }
 
 /** Compact "name arg" summary used for tool.started events. */
@@ -270,6 +513,40 @@ function describeDone(name: string, input: Record<string, unknown>): string {
 
 function truncate(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n)}…` : s
+}
+
+function addOptional(a?: number, b?: number): number | undefined {
+  return a === undefined && b === undefined ? undefined : (a ?? 0) + (b ?? 0)
+}
+
+function isJson(s: string): boolean {
+  try {
+    JSON.parse(s)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function retryReason(kind: unknown): string {
+  if (kind === 'rate_limit') return 'rate limited'
+  if (kind === 'overloaded') return 'provider overloaded'
+  return 'network error'
+}
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) return reject(abortError())
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      reject(abortError())
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
 }
 
 function isAbortError(err: unknown): boolean {
