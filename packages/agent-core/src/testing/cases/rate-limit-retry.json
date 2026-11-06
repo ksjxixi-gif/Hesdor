@@ -1,0 +1,19 @@
+{
+  "name": "rate-limit-retry",
+  "description": "A 429 before any output is retried; the same request then succeeds.",
+  "interactions": [
+    {
+      "note": "first attempt: rate limited",
+      "match": { "role": "user", "contains": ["say hello"] },
+      "error": { "message": "provider request failed with HTTP 429", "kind": "rate_limit", "retryable": true, "retryAfterMs": 0 }
+    },
+    {
+      "note": "retry of the same request",
+      "match": { "role": "user", "contains": ["say hello"] },
+      "chunks": [
+        { "type": "text", "text": "Hello after a retry." },
+        { "type": "finish", "reason": "stop", "usage": { "inputTokens": 10, "outputTokens": 5, "totalTokens": 15, "ready": true } }
+      ]
+    }
+  ]
+}
