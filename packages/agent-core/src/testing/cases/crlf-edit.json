@@ -1,0 +1,27 @@
+{
+  "name": "crlf-edit",
+  "description": "Edits a CRLF file with an LF find/replace (what read_file shows); the file must stay CRLF.",
+  "interactions": [
+    {
+      "match": { "role": "user" },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c1", "name": "read_file", "argumentsDelta": "{\"path\":\"notes.txt\"}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c1", "contains": ["line two"], "notContains": ["\\r"] },
+      "chunks": [
+        { "type": "tool_call", "index": 0, "id": "c2", "name": "apply_patch", "argumentsDelta": "{\"path\":\"notes.txt\",\"edits\":[{\"find\":\"line two\\nline three\",\"replace\":\"line 2\\nline three\"}]}" },
+        { "type": "finish", "reason": "tool_calls" }
+      ]
+    },
+    {
+      "match": { "role": "tool_result", "toolCallId": "c2", "contains": ["applied: 1"] },
+      "chunks": [
+        { "type": "text", "text": "Done." },
+        { "type": "finish", "reason": "stop" }
+      ]
+    }
+  ]
+}
