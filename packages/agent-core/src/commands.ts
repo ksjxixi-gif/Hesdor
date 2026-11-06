@@ -1,26 +1,15 @@
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
+import { parseFrontmatter } from './frontmatter.js'
+import type { SkillInfo } from './skills.js'
 
 export interface CustomCommand {
   name: string
   description: string
   /** Prompt body; `$ARGUMENTS` is replaced with the user's text. */
   template: string
-}
-
-function parseFrontmatter(raw: string): { description: string; body: string } {
-  if (!raw.startsWith('---')) return { description: '', body: raw }
-  const end = raw.indexOf('\n---', 3)
-  if (end < 0) return { description: '', body: raw }
-  const header = raw.slice(4, end)
-  const bodyStart = raw.indexOf('\n', end + 1)
-  const body = bodyStart < 0 ? '' : raw.slice(bodyStart + 1)
-  let description = ''
-  for (const line of header.split(/\r?\n/)) {
-    const idx = line.indexOf(':')
-    if (idx > 0 && line.slice(0, idx).trim() === 'description') description = line.slice(idx + 1).trim()
-  }
-  return { description, body }
+  /** When set (MCP prompts), the host awaits this with the user's text instead of filling `template`. */
+  expand?: (args: string) => Promise<string>
 }
 
 /**
@@ -46,7 +35,8 @@ export async function loadCommandsFrom(dirs: string[]): Promise<CustomCommand[]>
       } catch {
         continue
       }
-      const { description, body } = parseFrontmatter(raw)
+      const { meta, body } = parseFrontmatter(raw)
+      const description = (meta.description ?? '').replace(/\s+/g, ' ').trim()
       if (!byName.has(name)) byName.set(name, { name, description: description || firstLine(body).slice(0, 120), template: body.trim() })
     }
   }
@@ -56,4 +46,13 @@ export async function loadCommandsFrom(dirs: string[]): Promise<CustomCommand[]>
 
 function firstLine(text: string): string {
   return text.split(/\r?\n/).find((l) => l.trim() !== '') ?? ''
+}
+
+/** `/skill-name` runs a skill (user-explicit activation); a custom command with the same name wins. */
+export function skillCommand(skill: SkillInfo): CustomCommand {
+  return {
+    name: skill.name,
+    description: skill.description,
+    template: `Load the "${skill.name}" skill with read_skill and follow it.\n\n$ARGUMENTS`,
+  }
 }
