@@ -1,0 +1,119 @@
+name: Hesdor review
+description: Read-only AI review of a pull request with Hesdor, posted as one PR comment that is updated on every push.
+author: Hesdor
+branding:
+  icon: eye
+  color: blue
+
+# Use in two jobs of a `pull_request` workflow (never `pull_request_target`), see docs/github-action.md:
+#   mode: review  - job with `contents: read` and the provider key; runs `hesdor review`, uploads the report.
+#   mode: comment - job with `pull-requests: write` and no key; posts or updates the PR comment.
+inputs:
+  mode:
+    description: review (run the review; needs the provider key in env) or comment (post the report; needs pull-requests write)
+    default: review
+  provider:
+    description: Provider preset, e.g. anthropic, openai, openrouter (default from the CLI)
+    default: ''
+  model:
+    description: Model id for the provider (default from the preset)
+    default: ''
+  severity:
+    description: Lowest priority (P0-P3) that fails the review job
+    default: P1
+  base:
+    description: Base ref to diff against (default origin/<pull request base branch>)
+    default: ''
+  version:
+    description: Hesdor CLI version to run (pin one; "latest" follows new releases)
+    default: latest
+  github-token:
+    description: Token for posting the comment (comment mode)
+    default: ${{ github.token }}
+
+outputs:
+  exit-code:
+    description: Exit code of hesdor review (0 clean, 5 findings at or above severity, other values failures)
+    value: ${{ steps.review.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - if: inputs.mode == 'review'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: 24
+
+    - if: inputs.mode == 'review'
+      id: review
+      shell: bash
+      env:
+        PROVIDER: ${{ inputs.provider }}
+        MODEL: ${{ inputs.model }}
+        SEVERITY: ${{ inputs.severity }}
+        BASE: ${{ inputs.base }}
+        BASE_REF: ${{ github.base_ref }}
+        VERSION: ${{ inputs.version }}
+      run: |
+        out="$RUNNER_TEMP/hesdor-review"
+        mkdir -p "$out"
+        base="${BASE:-origin/$BASE_REF}"
+        args=(review --base "$base" --severity "$SEVERITY" --output-format json -o "$out/review.md")
+        if [ -n "$PROVIDER" ]; then args+=(-p "$PROVIDER"); fi
+        if [ -n "$MODEL" ]; then args+=(-m "$MODEL"); fi
+        set +e
+        # No --trust-workspace: plugins, hooks and MCP servers from the pull request never load.
+        npx --yes "@dean_overlord/hesdor@$VERSION" "${args[@]}" > "$out/review.json"
+        code=$?
+        set -e
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        if [ -f "$out/review.md" ]; then cat "$out/review.md" >> "$GITHUB_STEP_SUMMARY"; fi
+
+    - if: always() && inputs.mode == 'review'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: hesdor-review
+        path: ${{ runner.temp }}/hesdor-review
+        retention-days: 7
+        if-no-files-found: ignore
+
+    - if: inputs.mode == 'review'
+      shell: bash
+      env:
+        CODE: ${{ steps.review.outputs.exit-code }}
+      run: |
+        case "$CODE" in
+          0) ;;
+          5) echo "::error::Hesdor found issues at or above the severity threshold"; exit 1 ;;
+          *) echo "::error::hesdor review failed (exit $CODE)"; exit 1 ;;
+        esac
+
+    - if: inputs.mode == 'comment'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      continue-on-error: true # no artifact when the review job never ran
+      with:
+        name: hesdor-review
+        # Outside the workspace: the artifact is untrusted output of a run over the pull request.
+        path: ${{ runner.temp }}/hesdor-review
+
+    - if: inputs.mode == 'comment'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        report="$RUNNER_TEMP/hesdor-review/review.md"
+        if ! [[ "$PR" =~ ^[0-9]+$ ]]; then echo "::error::not a pull_request event"; exit 1; fi
+        if [ ! -f "$report" ]; then echo "no Hesdor report to post"; exit 0; fi
+        marker='<!-- hesdor-review -->'
+        body="$RUNNER_TEMP/hesdor-comment.md"
+        # The report is data: it is only ever passed as a file, never expanded by the shell. GitHub caps bodies at 65536 chars.
+        { echo "$marker"; head -c 60000 "$report"; } > "$body"
+        id=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+          --jq ".[] | select(.user.type == \"Bot\" and (.body | startswith(\"$marker\"))) | .id" | tail -n 1)
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$REPO/issues/comments/$id" -F "body=@$body" > /dev/null
+        else
+          gh api -X POST "repos/$REPO/issues/$PR/comments" -F "body=@$body" > /dev/null
+        fi
