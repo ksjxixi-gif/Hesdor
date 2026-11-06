@@ -1,0 +1,53 @@
+: recorded-style fixture, hand-authored (openai /responses)
+
+event: response.created
+data: {"type":"response.created","response":{"id":"resp_68f1","object":"response","created_at":1762400000,"model":"gpt-5-codex","status":"in_progress","output":[]},"sequence_number":0}
+
+event: response.in_progress
+data: {"type":"response.in_progress","response":{"id":"resp_68f1","object":"response","created_at":1762400000,"model":"gpt-5-codex","status":"in_progress","output":[]},"sequence_number":1}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":0,"item":{"id":"rs_01","type":"reasoning","summary":[]},"sequence_number":2}
+
+event: response.reasoning_summary_text.delta
+data: {"type":"response.reasoning_summary_text.delta","item_id":"rs_01","output_index":0,"summary_index":0,"delta":"**Planning** the fix — naïve approach first","sequence_number":3}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":0,"item":{"id":"rs_01","type":"reasoning","summary":[{"type":"summary_text","text":"**Planning** the fix — naïve approach first"}],"encrypted_content":"gAAAAABo8x-ENCRYPTED=="},"sequence_number":4}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":1,"item":{"id":"msg_01","type":"message","status":"in_progress","role":"assistant","content":[]},"sequence_number":5}
+
+event: response.content_part.added
+data: {"type":"response.content_part.added","item_id":"msg_01","output_index":1,"content_index":0,"part":{"type":"output_text","text":"","annotations":[]},"sequence_number":6}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_01","output_index":1,"content_index":0,"delta":"Running the tests 🧪 ","sequence_number":7}
+
+event: response.output_text.delta
+data: {"type":"response.output_text.delta","item_id":"msg_01","output_index":1,"content_index":0,"delta":"für Ünïcode — 日本語.","sequence_number":8}
+
+event: response.output_text.done
+data: {"type":"response.output_text.done","item_id":"msg_01","output_index":1,"content_index":0,"text":"Running the tests 🧪 für Ünïcode — 日本語.","sequence_number":9}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":1,"item":{"id":"msg_01","type":"message","status":"completed","role":"assistant","content":[]},"sequence_number":10}
+
+event: response.output_item.added
+data: {"type":"response.output_item.added","output_index":2,"item":{"id":"fc_01","type":"function_call","status":"in_progress","arguments":"","call_id":"call_Rz9","name":"run_command"},"sequence_number":11}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_01","output_index":2,"delta":"{\"command\":","sequence_number":12}
+
+event: response.function_call_arguments.delta
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_01","output_index":2,"delta":"\"pnpm test\"}","sequence_number":13}
+
+event: response.function_call_arguments.done
+data: {"type":"response.function_call_arguments.done","item_id":"fc_01","output_index":2,"arguments":"{\"command\":\"pnpm test\"}","sequence_number":14}
+
+event: response.output_item.done
+data: {"type":"response.output_item.done","output_index":2,"item":{"id":"fc_01","type":"function_call","status":"completed","arguments":"{\"command\":\"pnpm test\"}","call_id":"call_Rz9","name":"run_command"},"sequence_number":15}
+
+event: response.completed
+data: {"type":"response.completed","response":{"id":"resp_68f1","object":"response","created_at":1762400000,"model":"gpt-5-codex","status":"completed","output":[],"usage":{"input_tokens":5000,"input_tokens_details":{"cached_tokens":4096},"output_tokens":300,"output_tokens_details":{"reasoning_tokens":192},"total_tokens":5300}},"sequence_number":16}
+
