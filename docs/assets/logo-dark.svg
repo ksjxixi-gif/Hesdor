@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="80" viewBox="0 0 300 80" role="img" aria-label="Hesdor">
+  <rect x="8" y="8" width="64" height="64" rx="15" fill="#171a20" stroke="#2f3540" stroke-width="2"/>
+  <path d="M25 27 L39 40 L25 53" fill="none" stroke="#3ed6c1" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M53 41 L59 47 L53 53 L47 47 Z" fill="#f0b44c"/>
+  <text x="90" y="54" fill="#eef1f5" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace" font-size="42" font-weight="700" letter-spacing="-1">hesdor</text>
+</svg>
