@@ -9,10 +9,11 @@ import {
   readFilesTool,
   writeFileTool,
 } from './tools/fs.js'
-import { searchFilesTool } from './tools/search.js'
-import { runCommandTool, stopCommandTool } from './tools/shell.js'
+import { findFilesTool, searchFilesTool } from './tools/search.js'
+import { jobListTool, jobOutputTool, jobStopTool, runCommandTool } from './tools/shell.js'
 import { gitDiffTool, gitLogTool, gitStatusTool } from './tools/git-tools.js'
 import { exploreTool } from './tools/explore.js'
+import { webFetchTool } from './tools/web.js'
 
 /** Typed tool registry. Duplicate names are a programming error. */
 export class ToolRegistry {
@@ -41,9 +42,13 @@ export class ToolRegistry {
     return registry
   }
 
-  /** Wire-format descriptions for the model provider. */
+  /**
+   * Wire-format descriptions for the model provider: every tool, sorted by name and never
+   * filtered by mode, so the list is byte-stable for prompt caching. The runtime gate refuses
+   * calls the mode does not allow, and the mode rules in the system prompt say which those are.
+   */
   specs(): ToolSpec[] {
-    return this.list().map((t) => ({
+    return [...this.list()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)).map((t) => ({
       name: t.name,
       description: t.description,
       parametersJsonSchema:
@@ -59,13 +64,17 @@ export function createDefaultRegistry(): ToolRegistry {
     .register(readFileTool)
     .register(readFilesTool)
     .register(searchFilesTool)
+    .register(findFilesTool)
     .register(writeFileTool)
     .register(applyPatchTool)
     .register(deleteFileTool)
     .register(runCommandTool)
-    .register(stopCommandTool)
+    .register(jobOutputTool)
+    .register(jobStopTool)
+    .register(jobListTool)
     .register(exploreTool)
     .register(gitStatusTool)
     .register(gitDiffTool)
     .register(gitLogTool)
+    .register(webFetchTool)
 }
