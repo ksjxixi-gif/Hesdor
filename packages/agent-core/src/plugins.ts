@@ -1,8 +1,9 @@
-import { readdir } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { RunEvent } from '@hesdor/protocol'
+import type { HookConfig } from './hooks.js'
 
 export interface PluginBeforeResult {
   deny?: string
@@ -22,6 +23,8 @@ export interface LoadedPlugin {
   name: string
   file: string
   hooks: PluginHooks
+  /** Command hooks from hooks.json, run by the same dispatcher as the JS hooks. */
+  commandHooks?: HookConfig
 }
 
 export interface PluginWarning {
@@ -57,7 +60,8 @@ export async function loadPluginsFrom(dirs: string[]): Promise<{ plugins: Loaded
       if (!entry.isFile() || !/\.(mjs|js|cjs)$/i.test(entry.name)) continue
       const file = path.join(dir, entry.name)
       try {
-        const mod = await import(pathToFileURL(file).href)
+        // ESM caches by URL; the mtime query makes /reload pick up edited plugins.
+        const mod = await import(`${pathToFileURL(file).href}?t=${(await stat(file)).mtimeMs}`)
         const hooks = (mod.default ?? mod) as unknown
         if (typeof hooks !== 'object' || hooks === null) throw new Error('default export must be a hooks object')
         plugins.push({ name: entry.name.replace(/\.(mjs|js|cjs)$/i, ''), file, hooks: hooks as PluginHooks })
