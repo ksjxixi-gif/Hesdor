@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="636" viewBox="0 0 1040.0 636" role="img" aria-label="hesdor · ~/slugs">
+<style>text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono","Liberation Mono",monospace;font-size:14px;white-space:pre}</style>
+<rect x="0.5" y="0.5" width="1039.0" height="635" rx="10" fill="#0f1115" stroke="#2a2f38"/>
+<path d="M0.5 34V10.5a10 10 0 0 1 10-10H1029.5a10 10 0 0 1 10 10V34Z" fill="#191c22"/>
+<line x1="0.5" y1="34" x2="1039.5" y2="34" stroke="#2a2f38"/>
+<circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
+<text x="520.0" y="22" fill="#8b93a1" text-anchor="middle" style="font-size:13px">hesdor · ~/slugs</text>
+<g fill="#d4d8de" xml:space="preserve">
+<text x="16.0" y="64" fill="#c58ce6" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+<text x="16.0" y="83" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="83" fill="#5cc8c8" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">◆ hesdor</text>
+<text x="108.4" y="83" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">v0.1.0</text>
+<text x="595.6" y="83" fill-opacity="0.6" textLength="100.8" lengthAdjust="spacingAndGlyphs">slugs:main ·</text>
+<text x="704.8" y="83" fill="#8cc97a" fill-opacity="0.6" textLength="42.0" lengthAdjust="spacingAndGlyphs">build</text>
+<text x="755.2" y="83" fill-opacity="0.6" textLength="252.0" lengthAdjust="spacingAndGlyphs">· openai-compatible/demo-model</text>
+<text x="1015.6" y="83" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="102" fill="#c58ce6" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+<text x="16.0" y="121" fill="#c58ce6" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
+<text x="16.0" y="140" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="140" fill="#c58ce6" font-weight="bold" textLength="126.0" lengthAdjust="spacingAndGlyphs">⧉ review change</text>
+<text x="167.2" y="140" font-weight="bold" textLength="92.4" lengthAdjust="spacingAndGlyphs">src/slug.js</text>
+<text x="268.0" y="140" fill="#8cc97a" textLength="16.8" lengthAdjust="spacingAndGlyphs">+1</text>
+<text x="293.2" y="140" fill="#ef6b6b" textLength="16.8" lengthAdjust="spacingAndGlyphs">-1</text>
+<text x="1015.6" y="140" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="159" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="159" fill="#5cc8c8" textLength="126.0" lengthAdjust="spacingAndGlyphs">@@ -1,3 +1,3 @@</text>
+<text x="1015.6" y="159" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="178" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="178" fill-opacity="0.6" textLength="25.2" lengthAdjust="spacingAndGlyphs">1 1</text>
+<text x="83.2" y="178" fill="#5c6370" fill-opacity="0.6" textLength="268.8" lengthAdjust="spacingAndGlyphs">export function slugify(title) {</text>
+<text x="1015.6" y="178" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="197" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="197" fill-opacity="0.6" textLength="8.4" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="66.4" y="197" fill="#ef6b6b" textLength="403.2" lengthAdjust="spacingAndGlyphs">-   return title.toLowerCase().replace(&apos; &apos;, &apos;-&apos;)</text>
+<text x="1015.6" y="197" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="216" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="49.6" y="216" fill-opacity="0.6" textLength="8.4" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="66.4" y="216" fill="#8cc97a" textLength="487.2" lengthAdjust="spacingAndGlyphs">+   return title.toLowerCase().trim().replace(/\s+/g, &apos;-&apos;)</text>
+<text x="1015.6" y="216" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="235" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="235" fill-opacity="0.6" textLength="25.2" lengthAdjust="spacingAndGlyphs">3 3</text>
+<text x="83.2" y="235" fill="#5c6370" fill-opacity="0.6" textLength="8.4" lengthAdjust="spacingAndGlyphs">}</text>
+<text x="1015.6" y="235" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="254" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="254" fill-opacity="0.6" textLength="504.0" lengthAdjust="spacingAndGlyphs">[y] apply · [n] reject · [shift+a] always allow this session</text>
+<text x="1015.6" y="254" fill="#c58ce6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="273" fill="#c58ce6" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
+<text x="16.0" y="292" fill="#5c6370" textLength="1008.0" lengthAdjust="spacingAndGlyphs">┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐</text>
+<text x="16.0" y="311" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="311" fill="#8cc97a" textLength="58.8" lengthAdjust="spacingAndGlyphs">⠋ build</text>
+<text x="100.0" y="311" fill-opacity="0.6" textLength="428.4" lengthAdjust="spacingAndGlyphs">· openai-compatible/demo-model · esc cancel · local</text>
+<text x="847.6" y="311" fill-opacity="0.6" textLength="159.6" lengthAdjust="spacingAndGlyphs">/help · ctrl+c exit</text>
+<text x="1015.6" y="311" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="330" fill="#5c6370" textLength="1008.0" lengthAdjust="spacingAndGlyphs">└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘</text>
+</g>
+</svg>
