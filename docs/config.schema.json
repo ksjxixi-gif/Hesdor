@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/docs/config.schema.json",
+  "title": "Hesdor config.json",
+  "description": "User config (%APPDATA%/hesdor/config.json or ~/.config/hesdor/config.json). A project's .hesdor/config.json may only set mode, maxTokens, effort and model; other keys there are ignored with a warning.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "provider": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$", "description": "Default provider preset or custom provider id. Not allowed in a project file." },
+    "model": { "type": "string", "pattern": "^\\S+$", "description": "Legacy single default model; migrated into models on save. In a project file: the model for the provider you already use." },
+    "models": {
+      "type": "object",
+      "description": "Default model per provider id.",
+      "propertyNames": { "pattern": "^[a-z0-9][a-z0-9._-]{0,39}$" },
+      "additionalProperties": { "type": "string", "pattern": "^\\S+$" }
+    },
+    "mode": { "enum": ["build", "plan", "ask"], "description": "Interactive default mode." },
+    "effort": { "enum": ["low", "medium", "high"], "description": "Default reasoning effort." },
+    "maxTokens": { "type": "integer", "minimum": 1, "maximum": 1000000, "description": "Output token ceiling per model call (default 8192)." },
+    "baseUrls": { "type": "object", "additionalProperties": { "type": "string" } },
+    "customProviders": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["kind", "baseUrl"],
+        "properties": {
+          "kind": { "enum": ["openai", "openai-responses", "anthropic"] },
+          "baseUrl": { "type": "string", "minLength": 1 },
+          "authHeader": { "enum": ["x-api-key", "bearer"] },
+          "apiKeyCommand": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "extraBody": { "type": "object" },
+          "includeUsage": { "type": "boolean" }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "description": "run_command and file-write rules; deny beats ask beats allow.",
+      "properties": {
+        "allow": { "$ref": "#/$defs/rules" },
+        "ask": { "$ref": "#/$defs/rules" },
+        "deny": { "$ref": "#/$defs/rules" }
+      },
+      "additionalProperties": false
+    },
+    "updateCheck": { "type": "boolean" },
+    "roles": {
+      "type": "object",
+      "properties": {
+        "small": { "type": "string" },
+        "subagent": { "type": "string" },
+        "oracle": { "type": "string" },
+        "fallback": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "guardian": {
+      "type": "object",
+      "properties": { "enabled": { "type": "boolean" }, "model": { "type": "string" } },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "rules": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          { "type": "string", "description": "Command prefix, e.g. \"git push\"." },
+          { "type": "array", "items": { "type": "string" }, "description": "Command prefix as argv." },
+          { "type": "object", "required": ["write"], "properties": { "write": { "type": "string" } }, "additionalProperties": false },
+          { "type": "object", "required": ["fetch"], "properties": { "fetch": { "type": "string" } }, "additionalProperties": false }
+        ]
+      }
+    }
+  }
+}
