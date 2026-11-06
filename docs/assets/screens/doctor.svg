@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="838" height="313" viewBox="0 0 838.4 313" role="img" aria-label="hesdor doctor">
+<style>text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono","Liberation Mono",monospace;font-size:14px;white-space:pre}</style>
+<rect x="0.5" y="0.5" width="837.4" height="312" rx="10" fill="#0f1115" stroke="#2a2f38"/>
+<path d="M0.5 34V10.5a10 10 0 0 1 10-10H827.9a10 10 0 0 1 10 10V34Z" fill="#191c22"/>
+<line x1="0.5" y1="34" x2="837.9" y2="34" stroke="#2a2f38"/>
+<circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
+<text x="419.2" y="22" fill="#8b93a1" text-anchor="middle" style="font-size:13px">hesdor doctor</text>
+<g fill="#d4d8de" xml:space="preserve">
+<text x="16.0" y="64" fill="#8cc97a" textLength="58.8" lengthAdjust="spacingAndGlyphs">~/slugs</text>
+<text x="83.2" y="64" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">$</text>
+<text x="100.0" y="64" textLength="109.2" lengthAdjust="spacingAndGlyphs">hesdor doctor</text>
+<text x="16.0" y="83" textLength="210.0" lengthAdjust="spacingAndGlyphs">✓ Node.js        v26.12.1</text>
+<text x="16.0" y="102" textLength="378.0" lengthAdjust="spacingAndGlyphs">✓ Git            git version 2.56.0.windows.4</text>
+<text x="16.0" y="121" textLength="201.6" lengthAdjust="spacingAndGlyphs">✓ Repository     ~/slugs</text>
+<text x="16.0" y="140" textLength="529.2" lengthAdjust="spacingAndGlyphs">✗ ripgrep        not installed — using built-in fallback search</text>
+<text x="16.0" y="159" textLength="579.6" lengthAdjust="spacingAndGlyphs">✓ Managed settings none (C:\ProgramData\hesdor\managed-settings.json)</text>
+<text x="16.0" y="178" textLength="445.2" lengthAdjust="spacingAndGlyphs">✓ AI provider    openai-compatible · model demo-model</text>
+<text x="16.0" y="197" textLength="394.8" lengthAdjust="spacingAndGlyphs">✓ API credential local provider — no key needed</text>
+<text x="16.0" y="216" textLength="529.2" lengthAdjust="spacingAndGlyphs">✓ Telemetry      none — Hesdor collects and sends no usage data</text>
+<text x="16.0" y="235" textLength="378.0" lengthAdjust="spacingAndGlyphs">✓ Update check   off (HESDOR_NO_UPDATE_CHECK)</text>
+<text x="16.0" y="254" textLength="420.0" lengthAdjust="spacingAndGlyphs">✓ Extensions     0 commands · 0 skills · 0 plugins</text>
+<text x="16.0" y="292" textLength="336.0" lengthAdjust="spacingAndGlyphs">1 issue(s) found. Fix the ✗ items above.</text>
+</g>
+</svg>
