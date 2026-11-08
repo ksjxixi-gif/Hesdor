@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import os from 'node:os'
 import path from 'node:path'
 import { buildSystemPrompt, createHookDispatcher, findGitRoot, hookContextBlock, MAX_ATTEMPTS, runAgentLoop, ToolRegistry } from '@hesdor/agent-core'
@@ -14,6 +15,7 @@ import { missingKey, roleSelection } from './roles.js'
 import type { Roles } from './roles.js'
 import { checkpointTurn, endTurnCheckpoint } from '@hesdor/agent-core'
 import { loadPermissions } from './policy-cmd.js'
+import { loadChecksConfig, loadSandboxConfig } from './config-layers.js'
 
 /** Run wiring shared by the headless commands and the TUI. */
 
@@ -26,6 +28,7 @@ export const TOOL_VERBS: Record<string, string> = {
   apply_patch: 'Updating',
   delete_file: 'Deleting',
   run_command: 'Running',
+  run_tests: 'Testing',
   find_files: 'Finding',
   job_output: 'Checking job',
   job_stop: 'Stopping job',
@@ -36,6 +39,7 @@ export const TOOL_VERBS: Record<string, string> = {
   explore: 'Exploring',
   task: 'Delegating',
   oracle: 'Consulting oracle',
+  todo_write: 'Planning',
 }
 
 /** "read_file src/auth.ts" -> "Reading src/auth.ts" */
@@ -106,6 +110,8 @@ export function addUsage(a: Usage | undefined, b: Usage | undefined): Usage | un
 }
 
 export interface TurnOptions {
+  /** --trust-workspace: the project's (stricter-only) sandbox settings apply without a saved approval. */
+  trustWorkspace?: boolean
   provider: ModelProvider
   registry: ToolRegistry
   plugins: LoadedPlugin[]
@@ -163,6 +169,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   let costUsd: number | undefined
   let contextTokens: number | undefined
   let overBudget = false
+  // Prompt-cache routing key for every request of this session: a hash of the session id, never user data.
+  const cacheKey = opts.sessionId ? createHash('sha256').update(opts.sessionId).digest('hex').slice(0, 32) : undefined
   // Prices every request (main loop, roles and subagents) at its own model's price, and refuses the next one once the budget is spent.
   const priced = (p: ModelProvider): ModelProvider => {
     const pInfo = getModelInfo(p.name, p.model)
@@ -175,7 +183,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           // The loop ends a run on AbortError the same way it ends a cancel, with a valid history.
           throw Object.assign(new Error('cost budget reached'), { name: 'AbortError' })
         }
-        for await (const chunk of p.stream(messages, tools, signal)) {
+        for await (const chunk of p.stream(messages, tools, signal, cacheKey ? { cacheKey } : undefined)) {
           if (chunk.type === 'finish' && chunk.usage?.ready) {
             const cost = requestCostUsd(chunk.usage, pInfo)
             if (cost !== undefined) costUsd = (costUsd ?? 0) + cost
@@ -246,6 +254,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   }
   const prompt = submit.context.length > 0 ? `${opts.prompt}\n\n${hookContextBlock(submit.context)}` : opts.prompt
   const permissions = await loadPermissions(opts.root)
+  const sandbox = await loadSandboxConfig(opts.root, opts.trustWorkspace)
+  const checks = await loadChecksConfig(opts.root, opts.trustWorkspace)
   await checkpointTurn(opts.root, opts.sessionId ?? '', opts.history?.length ?? 0, { prompt: opts.prompt, emit: opts.emit })
 
   let steps = 0
@@ -280,8 +290,10 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     requestApproval,
     approvalsEnabled: opts.approvalsEnabled,
     permissions,
+    ...(sandbox ? { sandbox } : {}),
     // Only models the catalog marks as vision models get images from read_file.
     imageInput: info?.imageInput === true,
+    ...(checks ? { checks } : {}),
     ...(reviewChange ? { reviewChange } : {}),
     state: opts.state,
     // One runner for the read-only explore agent and task agents. Plugins and hooks see (and can deny) their
@@ -296,7 +308,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
       const subProvider = agent?.model && opts.providerFor ? priced(await opts.providerFor(agent.model)) : (subRole ?? inner)
       const sub = await runAgentLoop({
         provider: subProvider,
-        registry,
+        registry: registry.forModel(subProvider.model),
         plugins: opts.plugins,
         agent: agent?.name ?? 'explore',
         ctx: {
@@ -309,7 +321,9 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           requestApproval: agent ? requestApproval : () => Promise.resolve(false),
           approvalsEnabled: agent ? opts.approvalsEnabled : false,
           permissions,
+          ...(sandbox ? { sandbox } : {}),
           ...(agent && reviewChange ? { reviewChange } : {}),
+          ...(agent && checks ? { checks } : {}),
           // Own jobs and read stamps (it must not drain the main agent's job output); a task agent
           // shares the undo stack so /undo reverts its edits.
           state: { activeChild: null, snapshots: agent ? opts.state.snapshots : [], redo: agent ? opts.state.redo : [] },
@@ -329,7 +343,8 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
 
   const result = await runAgentLoop({
     provider,
-    registry: opts.registry,
+    // The model's edit format (V4A apply_patch for GPT-5+/Codex); a fallback model keeps the main model's tools.
+    registry: opts.registry.forModel(provider.model),
     ctx,
     systemPrompt: opts.systemPrompt,
     userPrompt: prompt,
