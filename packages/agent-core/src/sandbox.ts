@@ -118,6 +118,8 @@ export function seatbeltProfile(cfg: SandboxConfig, root: string, tmpDirs: strin
     `(allow file-write* ${writable.map((d) => `(subpath ${sbString(d)})`).join(' ')} (literal "/dev/null") (literal "/dev/zero") (literal "/dev/tty") (regex #"^/dev/fd/"))`,
   ]
   if (cfg.mode === 'workspace-write') lines.push(`(deny file-write* ${PROTECTED.map((p) => `(subpath ${sbString(path.posix.join(root, p))})`).join(' ')})`)
+  // Later rules win: a workspace inside a temp dir (e.g. /var/folders) must stay read-only despite the temp allowance.
+  else lines.push(`(deny file-write* (subpath ${sbString(root)}))`)
   if (!networkOn(cfg)) lines.push('(deny network-outbound (remote ip "*:*"))', '(deny network-inbound (local ip "*:*"))', '(deny network-bind (local ip "*:*"))')
   return lines.join('\n')
 }
