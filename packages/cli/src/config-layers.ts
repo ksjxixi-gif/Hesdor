@@ -361,6 +361,7 @@ export function parseSetting(key: string, raw: string, user: HesdorConfig, manag
     return error ? fail(error) : n
   }
   if (key === 'updateCheck' || key === 'guardian.enabled' || key === 'escalate') return raw === 'true' ? true : raw === 'false' ? false : fail('must be true or false')
+  if (key === 'profile' && raw === 'none') return undefined // removes the key (saveConfig drops undefined)
   if (key === 'effort' || key === 'mode' || key === 'profile') return CHECK[key](raw) ? fail(CHECK[key](raw)!) : raw
   if (key === 'provider') {
     known(raw)
@@ -381,7 +382,7 @@ export async function runConfigCommand(args: string[], cwd = process.cwd()): Pro
       const [head, leaf] = key.split('.') as [keyof HesdorConfig, string | undefined]
       if (leaf === undefined) await saveConfig({ [head]: value })
       else await saveConfig({ [head]: { ...(user[head] as object | undefined), [leaf]: value } })
-      console.log(`saved ${key} = ${show(value)} in ${configFile()}`)
+      console.log(value === undefined ? `removed ${key} from ${configFile()}` : `saved ${key} = ${show(value)} in ${configFile()}`)
       if ((MANAGED_SCALARS as string[]).includes(key) && (managed as Record<string, unknown>)[key] !== undefined) {
         console.log(`note: managed settings set ${key}; the managed value applies (${managedSettingsPath()})`)
       }
