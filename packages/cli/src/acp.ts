@@ -373,6 +373,7 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
 
       try {
         const result = await runTurn({
+          trustWorkspace: flags.trustWorkspace,
           provider: s.provider,
           registry: s.session.registry,
           plugins: s.session.plugins,
