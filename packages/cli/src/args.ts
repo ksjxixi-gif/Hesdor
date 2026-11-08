@@ -128,7 +128,7 @@ Setup:
   hesdor upgrade               Print the upgrade command for this install
   hesdor config list           Effective settings and the layer that set each
                                (managed, flag, env, project, user, default)
-  hesdor config get <key>      One effective value, e.g. hesdor config get maxTokens
+  hesdor config get <key>      One effective value, e.g. config get maxTokens
   hesdor config set <key> <value>
                                Save a validated value in your user config.json
 
@@ -139,11 +139,11 @@ Options:
                                cerebras, sambanova, nvidia, huggingface,
                                cohere, deepinfra, moonshot, kimi-code, zai,
                                qwen, qwen-coding-plan, minimax, stepfun,
-                               vercel, requesty, chatgpt,
-                               nebius, novita, baseten, chutes, bedrock,
-                               azure-claude, azure-openai, ollama, lmstudio,
-                               litellm, llamacpp, vllm, jan,
-                               openai-compatible, anthropic-compatible, or any
+                               vercel, requesty, chatgpt, nebius, novita,
+                               baseten, chutes, bedrock, azure-claude,
+                               azure-openai, ollama, lmstudio, litellm,
+                               llamacpp, vllm, jan, openai-compatible,
+                               anthropic-compatible, or any
                                custom provider saved by \`hesdor setup\`
   -m, --model <model>          Model id for the provider
       --base-url <url>         Override the provider endpoint
@@ -171,11 +171,11 @@ Environment:
   DEEPSEEK_API_KEY, MISTRAL_API_KEY, TOGETHER_API_KEY, FIREWORKS_API_KEY,
   XAI_API_KEY, OPENCODE_API_KEY, GEMINI_API_KEY (or GOOGLE_API_KEY,
   GOOGLE_GENERATIVE_AI_API_KEY), CEREBRAS_API_KEY, SAMBANOVA_API_KEY,
-  NVIDIA_API_KEY, HF_TOKEN, COHERE_API_KEY, DEEPINFRA_TOKEN (or DEEPINFRA_API_KEY),
-  OPENAI_COMPATIBLE_API_KEY, ANTHROPIC_COMPATIBLE_API_KEY,
+  NVIDIA_API_KEY, HF_TOKEN, COHERE_API_KEY, DEEPINFRA_TOKEN (or
+  DEEPINFRA_API_KEY), OPENAI_COMPATIBLE_API_KEY, ANTHROPIC_COMPATIBLE_API_KEY,
   HESDOR_API_KEY, HESDOR_BASE_URL, HESDOR_<PROVIDER_ID>_API_KEY for a custom
-  provider (HESDOR_CUSTOM_API_KEY for one-off --base-url runs) — or save keys once
-  with \`hesdor setup\`.
+  provider (HESDOR_CUSTOM_API_KEY for one-off --base-url runs) — or save keys
+  once with \`hesdor setup\`.
   Keys are never stored inside repositories.
   Each preset reads its own key variable (see the README's Providers section).
   Proxy: HTTPS_PROXY / HTTP_PROXY / NO_PROXY (Node 24.14+, or set
@@ -194,33 +194,37 @@ Headless (run/ask/plan):
       --guardian               Let the guardian model (config guardian.model or
                                roles.small) approve risky commands; a deny or
                                error refuses them
+      --goal "<condition>"     run: after each turn an evaluator model
+                               (roles.small or the main model) checks the
+                               condition; keeps going until met. Exit 0 met,
+                               6 impossible or out of turns
+      --max-goal-turns <n>     Turn limit for --goal (default 10)
+      --worktree[=name]        Run in a new git worktree
+                               .hesdor/worktrees/<name> on branch
+                               hesdor/<name> (name generated if omitted);
+                               kept when it has changes
   A prompt of "-" (or none, with piped stdin) is read from stdin.
   Exit codes: 0 completed, 1 failed, 2 step budget reached, 3 provider error
   (auth, network, rate limit after retries, quota), 4 cost budget reached,
   130 cancelled.
-      --goal "<condition>"     run: after each turn an evaluator model (roles.small
-                               or the main model) checks the condition; keeps
-                               going until met. Exit 0 met, 6 impossible or out
-                               of turns
-      --max-goal-turns <n>     Turn limit for --goal (default 10)
-      --worktree[=name]        Run in a new git worktree .hesdor/worktrees/<name>
-                               on branch hesdor/<name> (name generated if
-                               omitted); kept when it has changes
 
 Review (hesdor review):
       --base <ref>             Compare HEAD with its merge base with <ref>
                                (default origin/HEAD, origin/main, main, ...)
       --uncommitted            Review staged, unstaged and untracked changes
-      --severity <P0-P3>       Lowest priority that fails the review (default P1)
+      --severity <P0-P3>       Lowest priority that fails the review
+                               (default P1)
       --output-format <fmt>    text (default, Markdown) | json
   -o, --output <file>          Also write the Markdown report to <file>
   Exit code 5: at least one finding at or above --severity; others as headless.
 
 Extensions (project .hesdor/ dir, global config dir):
-  commands/<name>.md   custom slash commands; $ARGUMENTS in the template
-  skills/<name>/SKILL.md  workflows the model loads via read_skill
-  plugins/*.js         hooks: tool.execute.before/after, event
-  mcp.json             MCP servers: { "mcp": { "name": { "command": "...", "args": [] } } }
+  commands/<name>.md           Custom slash commands; $ARGUMENTS in the template
+  skills/<name>/SKILL.md       Workflows the model loads via read_skill
+  plugins/*.js                 Hooks: tool.execute.before/after, event
+  mcp.json                     MCP servers:
+                               { "mcp": { "<name>": { "command": "...",
+                                 "args": [] } } }
 
 Docs: https://github.com/ksjxixi-gif/Hesdor`
 
