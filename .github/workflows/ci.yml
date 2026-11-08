@@ -27,10 +27,16 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
+      # Real sandbox tests (sandbox.test.ts) need bwrap; Ubuntu 24.04's AppArmor blocks its unprivileged user namespaces by default.
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: node --test scripts/release scripts/screens
       - run: pnpm build
       - name: Smoke test the bundled CLI
         shell: bash
