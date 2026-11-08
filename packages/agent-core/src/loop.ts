@@ -15,6 +15,7 @@ import type { LoadedPlugin } from './plugins.js'
 import { assertRiskAllowed, PermissionDeniedError } from './policy.js'
 import type { ToolRegistry } from './registry.js'
 import { capOutput, formatToolResult, selfLimited } from './tool-output.js'
+import { checksFor } from './checks.js'
 
 export const DEFAULT_MAX_STEPS = 100
 export const MAX_ATTEMPTS = 4
@@ -29,6 +30,9 @@ const BUDGET_DONE =
   '\n\n[the tool step budget is used up, so no more tools will run. Reply now WITHOUT calling tools: summarize what you did, what is still left to do, and anything the user should check.]'
 
 const EDIT_TOOLS = new Set(['write_file', 'apply_patch', 'delete_file'])
+/** run_command calls that count as running tests for the run_tests nudge. */
+const TEST_COMMAND = /\b(test|tests|vitest|jest|mocha|pytest)\b/
+const TEST_NUDGE = '\n\n[hint: files changed. When the change is complete, run run_tests to verify it.]'
 /** Polling the same job with the same arguments is normal, not a loop. */
 const POLLING_TOOLS = new Set(['job_output', 'job_list'])
 
@@ -246,8 +250,7 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
     if (same >= 3 && !POLLING_TOOLS.has(call.name)) {
       return `you are looping: this is call #${same} of ${call.name} with identical arguments, and nothing was edited in between, so it was NOT run. Change approach: re-read the relevant code, try a different fix, or tell the user what blocks you.`
     }
-    const target = asRecord(args).path
-    if (EDIT_TOOLS.has(call.name) && typeof target === 'string') {
+    for (const target of EDIT_TOOLS.has(call.name) ? editedPaths(asRecord(args)) : []) {
       const edits = (editsPerPath.get(target) ?? 0) + 1
       editsPerPath.set(target, edits)
       if (edits === 5) {
@@ -256,6 +259,10 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
     }
     return undefined
   }
+
+  let edited = false
+  let testsRan = false
+  let testNudged = false
 
   const warnAt = Math.ceil(maxSteps * 0.8)
   ctx.emit({ type: 'run.started', mode: ctx.mode, model: provider.model })
@@ -327,7 +334,14 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
         }
         const resultMessage = await executeCall(call, registry, ctx, hooks)
         if (EDIT_TOOLS.has(call.name) && !resultMessage.isError) sameCalls.clear() // re-running tests after an edit is not a loop
+        if (EDIT_TOOLS.has(call.name) && !resultMessage.isError) edited = true
+        if (call.name === 'run_tests' || (call.name === 'run_command' && TEST_COMMAND.test(call.argumentsJson))) testsRan = true
         messages.push(resultMessage)
+      }
+      // Once per run: files changed and no tests ran yet, and the project has a test runner.
+      if (edited && !testsRan && !testNudged && registry.get('run_tests')) {
+        testNudged = true
+        if ((await checksFor(ctx).catch(() => undefined))?.test) noteOnLastResult(TEST_NUDGE)
       }
       if (steps === warnAt && warnAt < maxSteps) noteOnLastResult(budgetNotice(steps, maxSteps))
     }
@@ -475,13 +489,21 @@ function parseArgs(json: string): unknown {
   }
 }
 
+/** Files an edit call touches: `path`, or the file headers of a V4A patch in `input`. */
+export function editedPaths(args: Record<string, unknown>): string[] {
+  if (typeof args.path === 'string') return [args.path]
+  if (typeof args.input !== 'string') return []
+  return [...args.input.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+?)\s*$/gm)].map((m) => m[1]!)
+}
+
 /** Compact "name arg" summary used for tool.started events. */
 function describeCall(call: ToolCallRequest): string {
   try {
     const o = JSON.parse(call.argumentsJson || '{}') as Record<string, unknown>
+    const paths = editedPaths(o)
     const hint =
-      typeof o.path === 'string'
-        ? o.path
+      paths.length > 0
+        ? paths.join(', ')
         : typeof o.command === 'string'
           ? o.command
           : typeof o.pattern === 'string'
@@ -494,7 +516,7 @@ function describeCall(call: ToolCallRequest): string {
 }
 
 function describeDone(name: string, input: Record<string, unknown>): string {
-  const p = typeof input.path === 'string' ? input.path : undefined
+  const p = editedPaths(input).join(', ') || undefined
   switch (name) {
     case 'write_file':
       return p ? `wrote ${p}` : name
