@@ -111,9 +111,11 @@ describe('install.ps1', { skip: process.platform !== 'win32' && 'Windows only' }
     server.close()
     rmSync(tmp, { recursive: true, force: true })
   })
-  // Windows PowerShell 5.1, the shell `irm ... | iex` users have by default.
+  // Windows PowerShell 5.1, the shell `irm ... | iex` users have by default. Started from pwsh 7 (CI's
+  // default shell), it inherits pwsh's PSModulePath and can't load its own modules, so drop it.
+  const { PSModulePath: _pwshModules, ...cleanEnv } = process.env
   const install = (dir, version) =>
-    run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(PACKAGING, 'install.ps1'), '-Version', version, '-InstallDir', dir, '-BaseUrl', server.url, '-NoPath'])
+    run('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(PACKAGING, 'install.ps1'), '-Version', version, '-InstallDir', dir, '-BaseUrl', server.url, '-NoPath'], { env: cleanEnv })
 
   test('installs a pinned version and latest when the checksum matches', async () => {
     for (const version of ['v9.9.9', 'latest']) {
