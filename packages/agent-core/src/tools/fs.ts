@@ -7,6 +7,7 @@ import { assertWritable, safeResolve, toRel } from '../paths.js'
 import { GitIgnoreMatcher } from '../ignore.js'
 import { decideWrite, PermissionDeniedError, requireUserApproval } from '../policy.js'
 import type { ToolContext } from '../context.js'
+import { writeWithChecks } from '../checks.js'
 import { defineTool } from './types.js'
 
 /** Bytes one read returns, line-number prefixes included (about 16k tokens); read_files splits it across its files. */
@@ -19,7 +20,7 @@ const MAX_LIST_ENTRIES = 2000
 const stampOf = (info: { mtimeMs: number; size: number }): string => `${info.mtimeMs}:${info.size}`
 
 /** Remember how a file looked when the agent last read or wrote it (stale-edit guard). */
-async function recordStamp(ctx: ToolContext, abs: string): Promise<void> {
+export async function recordStamp(ctx: ToolContext, abs: string): Promise<void> {
   try {
     ;(ctx.state.fileStamps ??= new Map()).set(abs, stampOf(await stat(abs)))
   } catch {
@@ -32,7 +33,7 @@ async function recordStamp(ctx: ToolContext, abs: string): Promise<void> {
  * A file never read this session is not blocked: apply_patch's exact `find` already proves
  * the model knows the current text, and requiring a read first would break blind small edits.
  */
-async function assertFresh(ctx: ToolContext, abs: string, relPath: string): Promise<void> {
+export async function assertFresh(ctx: ToolContext, abs: string, relPath: string): Promise<void> {
   const known = ctx.state.fileStamps?.get(abs)
   if (known === undefined) return
   const now = await stat(abs).then(stampOf, () => 'missing')
@@ -49,7 +50,7 @@ function cleanOptional(value: string | undefined): string | undefined {
 const MAX_SNAPSHOTS = 50
 
 /** Prior file bytes (binary-safe for /undo), or null when the file does not exist. */
-async function readBefore(abs: string): Promise<Buffer | null> {
+export async function readBefore(abs: string): Promise<Buffer | null> {
   try {
     return await readFile(abs)
   } catch (err) {
@@ -58,24 +59,24 @@ async function readBefore(abs: string): Promise<Buffer | null> {
   }
 }
 
-const BOM = '﻿'
-const toLf = (text: string): string => text.replace(/\r\n/g, '\n')
+export const BOM = '﻿'
+export const toLf = (text: string): string => text.replace(/\r\n/g, '\n')
 
 /** EOL style (CRLF by majority) and BOM of existing content, so edits keep the file's format. */
-function fileFormat(text: string): { crlf: boolean; bom: boolean } {
+export function fileFormat(text: string): { crlf: boolean; bom: boolean } {
   const crlf = text.split('\r\n').length - 1
   const lf = text.split('\n').length - 1 - crlf
   return { crlf: crlf > lf, bom: text.startsWith(BOM) }
 }
 
 /** Re-apply a file's EOL style and BOM to LF text without a BOM. */
-function applyFormat(lfText: string, format: { crlf: boolean; bom: boolean }): string {
+export function applyFormat(lfText: string, format: { crlf: boolean; bom: boolean }): string {
   const body = format.crlf ? lfText.replace(/\n/g, '\r\n') : lfText
   return format.bom ? BOM + body : body
 }
 
 /** Capture prior content post-approval so /undo can restore it. */
-function pushSnapshot(ctx: ToolContext, abs: string, before: Buffer | null): void {
+export function pushSnapshot(ctx: ToolContext, abs: string, before: Buffer | null): void {
   ctx.state.redo.length = 0
   ctx.state.snapshots.push({ path: abs, content: before })
   if (ctx.state.snapshots.length > MAX_SNAPSHOTS) ctx.state.snapshots.shift()
@@ -84,7 +85,7 @@ function pushSnapshot(ctx: ToolContext, abs: string, before: Buffer | null): voi
 const asText = (bytes: Buffer | null): string | null => (bytes === null ? null : bytes.toString('utf8'))
 
 /** Permission rules, then the host review gate for file mutations; throws when refused. */
-async function requireApproved(
+export async function requireApproved(
   ctx: ToolContext,
   abs: string,
   relPath: string,
@@ -320,11 +321,12 @@ export const writeFileTool = defineTool({
         : input.content
     await requireApproved(ctx, abs, toRel(ctx.root, abs), before, content)
     await mkdir(path.dirname(abs), { recursive: true })
-    await writeFile(abs, content, 'utf8')
+    // Format and lint after the write; the snapshot keeps the pre-edit bytes, so /undo restores those.
+    const checked = await writeWithChecks(ctx, abs, () => writeFile(abs, content, 'utf8'))
     await recordStamp(ctx, abs)
     pushSnapshot(ctx, abs, before)
     ctx.emit({ type: 'file.changed', path: toRel(ctx.root, abs), op: 'write' })
-    return { path: toRel(ctx.root, abs), bytes: Buffer.byteLength(content, 'utf8') }
+    return { path: toRel(ctx.root, abs), bytes: Buffer.byteLength(content, 'utf8'), ...checked }
   },
 })
 
@@ -401,7 +403,7 @@ export const applyPatchTool = defineTool({
     }
     updated = applyFormat(updated, format)
     await requireApproved(ctx, abs, toRel(ctx.root, abs), originalBytes, updated)
-    await writeFile(abs, updated, 'utf8')
+    const checked = await writeWithChecks(ctx, abs, () => writeFile(abs, updated, 'utf8'))
     await recordStamp(ctx, abs)
     pushSnapshot(ctx, abs, originalBytes)
     ctx.emit({ type: 'file.changed', path: toRel(ctx.root, abs), op: 'write' })
@@ -409,6 +411,7 @@ export const applyPatchTool = defineTool({
       path: toRel(ctx.root, abs),
       applied: input.edits.length,
       ...(tolerant > 0 ? { whitespaceTolerant: tolerant } : {}),
+      ...checked,
     }
   },
 })
