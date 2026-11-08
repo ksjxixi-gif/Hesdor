@@ -50,7 +50,8 @@ The JSON result and the exit code are mapped as follows:
 | no JSON | crash | `RuntimeError` (infra) |
 
 Tokens (`n_input_tokens`, `n_output_tokens`, `n_cache_tokens`) and `cost_usd` go to Harbor's
-`AgentContext`; status, steps and `error_category` go to `context.metadata`. Raw output is in the
+`AgentContext`; status, steps, `error_category`, the routing `profile` and the number of `escalations`
+go to `context.metadata`. Raw output is in the
 trial's `agent/hesdor.json` and `agent/hesdor.stderr`.
 
 ### Running a small Terminal-Bench subset locally
@@ -78,12 +79,15 @@ Notes:
 
 - `-m` is `<hesdor provider id>/<model id>`; everything after the first `/` is the model id, so
   `-m openrouter/qwen/qwen3-coder` runs `--provider openrouter --model qwen/qwen3-coder`.
+- `--ak profile=economy` runs `hesdor run --profile economy` (with or without `-m`);
+  `--ak max_budget_usd=2` caps each trial's cost (`--max-budget-usd`, exit 4, a task failure).
 - Keys: the adapter forwards common `*_API_KEY` variables from your shell; any other variable can be
   passed with `--ae NAME=value`.
 - Use `-i '<glob>'` / `-x '<name>'` to pick tasks, `--ak version=0.1.0` to pin the CLI version, and
   `-r 2 --retry-include ApiRateLimitError` to retry rate-limited trials.
-- `harbor datasets list` shows the available dataset refs (Terminal-Bench 2.1, Aider polyglot,
-  SWE-bench variants). Pin the ref you report.
+- `harbor datasets list` shows the registry datasets (`terminal-bench@2.0`, Aider polyglot, SWE-bench
+  variants); Terminal-Bench 2.1 and 4.0 are on Harbor Hub as `terminal-bench/terminal-bench-2-1` and
+  `terminal-bench/terminal-bench@4.0.0`. Pin the ref you report.
 - Pin CPU and memory (`--override-memory-mb`, task `task.toml`) and rerun on different days:
   resource settings alone moved TB2 scores by about 6 points in Anthropic's measurements.
 - `evals/jobs/` holds transcripts. Read them: grader bugs hide real ability.
@@ -93,6 +97,12 @@ Self-check of the result parser (no Harbor or Docker needed):
 ```sh
 python -I -c "import sys; sys.path.insert(0, 'evals/harbor'); exec(open('evals/harbor/test_hesdor_result.py').read())"
 ```
+
+### Comparing contenders
+
+`scripts/bench/matrix.mjs` runs Hesdor profiles, Hesdor with explicit models, Claude Code, Codex and
+mini-swe-agent on the same tasks from one spec (`evals/matrix/*.json`) and aggregates pass rates and
+dollars per solved task. See [docs/benchmarks.md](../docs/benchmarks.md).
 
 ### Scoring: pass@k and pass^k
 
