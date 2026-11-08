@@ -55,9 +55,14 @@ LOG = "/logs/agent"
 
 
 class Hesdor(BaseInstalledAgent):
-    def __init__(self, *args, max_steps: int | str = 30, **kwargs):
+    def __init__(
+        self, *args, max_steps: int | str = 30, profile: str | None = None,
+        max_budget_usd: float | str | None = None, **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._max_steps = int(max_steps)
+        self._profile = profile or None
+        self._max_budget_usd = float(max_budget_usd) if max_budget_usd not in (None, "") else None
 
     @staticmethod
     def name() -> str:
@@ -80,6 +85,10 @@ class Hesdor(BaseInstalledAgent):
         if self.model_name:
             provider, _, model = self.model_name.partition("/")
             model_flags = f"--provider {shlex.quote(provider)} " + (f"--model {shlex.quote(model)} " if model else "")
+        if self._profile:
+            model_flags += f"--profile {shlex.quote(self._profile)} "
+        if self._max_budget_usd is not None:
+            model_flags += f"--max-budget-usd {self._max_budget_usd} "
         env = {k: os.environ[k] for k in KEY_VARS if k in os.environ}
 
         # Hesdor's exit code carries the outcome; capture it instead of letting a non-zero exit raise.
@@ -103,6 +112,9 @@ class Hesdor(BaseInstalledAgent):
             "hesdor_steps": run.steps,
             "hesdor_error": run.error,
             "hesdor_error_category": run.error_category,
+            # The profile Hesdor reports (falls back to the requested one) and its escalations.
+            "hesdor_profile": run.profile or self._profile,
+            "hesdor_escalations": run.escalations,
         }
 
         # Task failures (1 failed, 2 step budget, 4 cost budget) are left to the verifier.
