@@ -4,7 +4,9 @@ import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { OpenAICompatibleProvider } from '@hesdor/providers'
 import type { ChatMessage, ModelProvider, StreamChunk, ToolSpec } from '@hesdor/protocol'
-import { createDefaultRegistry } from './registry.js'
+import { z } from 'zod'
+import { createDefaultRegistry, ToolRegistry } from './registry.js'
+import { defineTool } from './tools/types.js'
 import { runAgentLoop } from './loop.js'
 import type { ToolContext } from './context.js'
 import type { RunEvent } from '@hesdor/protocol'
@@ -299,6 +301,52 @@ describe('loop detection', () => {
     const errors = result.messages.filter((m) => m.role === 'tool_result').map((m) => m.isError)
     expect(errors).toEqual([false, false, false, false, true, false])
     expect(result.messages.find((m) => m.toolCallId === 'w5')!.content).toContain('edit #5 to f.txt')
+  })
+})
+
+describe('stuck signals (run.stuck)', () => {
+  const stuckOf = (events: RunEvent[]) => events.flatMap((e) => (e.type === 'run.stuck' ? [e.reason] : []))
+
+  it('reports a loop refusal', async () => {
+    const same = (id: string): StreamChunk[] => toolCallChunks(id, 'list_files', '{}')
+    const provider = new ScriptedProvider([same('a'), same('b'), same('c'), [{ type: 'text', text: 'ok' }]])
+    const { ctx, events } = testCtx(process.cwd(), 'ask')
+    await runAgentLoop({ provider, registry: createDefaultRegistry(), ctx, systemPrompt: '', userPrompt: '' })
+    expect(stuckOf(events)).toEqual(['loop'])
+  })
+
+  it('reports run_tests failing 3 times in a row without fewer failures, and not while failures drop', async () => {
+    const counts = [3, 2, 2, 2, 2]
+    // A fake run_tests reporting n failures (one listed, the rest as moreFailures, like the real tool).
+    const tests = new ToolRegistry().register(
+      defineTool({
+        name: 'run_tests',
+        description: 'fake',
+        risk: 'READ',
+        schema: z.object({ n: z.number() }),
+        execute: ({ n }) => Promise.resolve({ result: 'failed', failures: ['x'], moreFailures: n - 1 }),
+      }),
+    )
+    const provider = new ScriptedProvider([...counts.map((n, i) => toolCallChunks(`t${i}`, 'run_tests', JSON.stringify({ n, i }))), [{ type: 'text', text: 'ok' }]])
+    const { ctx, events } = testCtx(process.cwd(), 'ask')
+    await runAgentLoop({ provider, registry: tests, ctx, systemPrompt: '', userPrompt: '' })
+    // 3 → 2 is progress; 2, 2, 2 is the third failing run without fewer failures.
+    expect(stuckOf(events)).toEqual(['tests_failing'])
+    expect(events.findIndex((e) => e.type === 'run.stuck')).toBeGreaterThan(events.findIndex((e) => e.type === 'tool.completed' && e.callId === 't3'))
+  })
+
+  it('reports 2 turns in a row with cut-off or invalid tool calls', async () => {
+    const provider = new ScriptedProvider([
+      [
+        { type: 'tool_call', index: 0, id: 'w1', name: 'write_file', argumentsDelta: '{"path":"big.txt","content":"aa' },
+        { type: 'finish', reason: 'length' },
+      ],
+      toolCallChunks('u1', 'no_such_tool', '{}'),
+      [{ type: 'text', text: 'ok' }],
+    ])
+    const { ctx, events } = testCtx(mkdtempSync(path.join(tmpdir(), 'hesdor-stuck-')), 'build', { approvals: true })
+    await runAgentLoop({ provider, registry: createDefaultRegistry(), ctx, systemPrompt: '', userPrompt: '' })
+    expect(stuckOf(events)).toEqual(['invalid_calls'])
   })
 })
 
