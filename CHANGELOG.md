@@ -34,6 +34,8 @@ the published CLI package (`packages/cli`).
 
 ### Changed
 
+- **Much faster startup:** the npm package is code-split (`dist/bundle.js` plus `dist/chunks/`). `hesdor --version` and `--help` start in about 80 ms instead of about 0.8 s, doctor and headless runs no longer load Ink and React, the MCP SDK loads only when MCP servers are configured and the ACP SDK only for `hesdor acp`. The standalone binaries stay single files.
+- Profile resolution is cached per process and re-read only when config.json, auth.json or the ChatGPT sign-in file changes.
 - The diff review is full height and scrollable (arrows, PgUp/PgDn, Home/End) with old and new line numbers, `@@` hunk headers, and visible tabs and trailing spaces on changed lines.
 - The transcript scrolls by wrapped lines, so long messages can be read in full.
 - Tool results are plain text instead of JSON: `read_file` shows line numbers, and long outputs keep the first 40% and last 60% with the full text saved to `.hesdor/out/`.
@@ -49,6 +51,8 @@ the published CLI package (`packages/cli`).
 
 ### Fixed
 
+- A chat `/rewind` no longer overwrites the saved transcript: the conversation continues in a new session linked to the old one, and `/rewind` still offers the old session's checkpoints up to the rewind point.
+- ACP: a compacted session keeps its full transcript under a linked session id instead of overwriting it, and ACP checkpoints are keyed by the real session id.
 - The `--goal` and `/goal` evaluator's cost counts against `--max-budget-usd` and the TUI cost total.
 - SSE streams with lone CR line endings are parsed, as the spec allows.
 - `--trust-workspace` applies a project's sandbox and checks settings without a saved approval.
@@ -81,6 +85,11 @@ the published CLI package (`packages/cli`).
 
 ### Added
 
+- **`hesdor doctor --live`:** an opt-in real check of every provider with a usable credential: a streamed reply, a tool-call round trip with reasoning-state replay, usage and cache fields, latency and catalog cost. It prints a worst-case cost first and asks before sending (`--yes` skips the question); `-p` tests one provider and `--output-format json` is supported.
+- **`pnpm test:live`:** a live provider suite (the agent loop over two tool steps, prompt-cache fields, image input, the ChatGPT plan), skipped per provider without a key and never part of `pnpm test`. It writes `evals/live/report-<date>.md`.
+- **Disk hygiene:** turn checkpoints are pruned in the background at session start (at most once a day per workspace) to the newest 100 and none older than 30 days, followed by `git gc` of the shadow repository; spilled tool outputs in `.hesdor/out/` are deleted after 7 days. New `hesdor checkpoints [list]` and `hesdor checkpoints prune [--all]`, and an optional `sessions.retainDays` (default: keep forever).
+- **ACP sessions use roles** like the TUI: fallback, escalation, the guardian, and the small and subagent models. Model switches, guardian decisions, stuck runs and compactions arrive as notices, and the todo list as an ACP plan.
+- `hesdor config set profile none` removes a saved profile; `/model` under an active profile notes that the choice lasts for the session.
 - **Profiles:** `--profile economy|balanced|frontier` (also `HESDOR_PROFILE` or `profile` in config.json; managed settings can lock it, a project cannot set it) picks the main model, `small`, `oracle`, a cross-vendor `fallback` and an escalation ladder from ranked lists, using the first candidate you have a key for. `-p`/`-m` and roles you set yourself win. `hesdor doctor` and `/status` show what each tier resolved to and which keys would enable the missing ones.
 - **Escalation:** with economy or balanced, a stuck run (a loop refusal, 3 failing `run_tests` without progress, or 2 turns of cut-off or invalid tool calls) switches to the next stronger model for the rest of the turn, at most twice and never back down, emitting `run.stuck` and `provider.escalated`. Costs count toward `--max-budget-usd`; turn it off with `escalate: false` or set your own ladder with `roles.escalation`. Headless JSON results add `provider`, `model`, `profile` and `escalations`.
 - **Benchmark tooling:** `scripts/bench/matrix.mjs` runs Terminal-Bench through Harbor for Hesdor profiles and for Claude Code and Codex on the same tasks, and reports pass@k, pass^k, 95% confidence intervals and dollars per solved task as a table and a light/dark chart. It dry-runs by default with a cost estimate. The Harbor adapter accepts `profile` and `max_budget_usd`. See `docs/benchmarks.md`.
