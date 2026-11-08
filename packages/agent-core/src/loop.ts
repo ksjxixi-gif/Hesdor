@@ -263,6 +263,26 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
   let edited = false
   let testsRan = false
   let testNudged = false
+  // Stuck signals for the host (run.ts escalates on them): model turns in a row with cut-off or invalid
+  // calls, and failing run_tests in a row without fewer failures.
+  let badTurns = 0
+  let failingTests = 0
+  let lastFailures: number | undefined
+  const stuck = (reason: 'loop' | 'tests_failing' | 'invalid_calls', detail: string): void => ctx.emit({ type: 'run.stuck', reason, detail })
+  const trackTests = (result: Record<string, unknown>): void => {
+    if (result.result === 'passed') {
+      failingTests = 0
+      lastFailures = undefined
+      return
+    }
+    const failures = (Array.isArray(result.failures) ? result.failures.length : 0) + (typeof result.moreFailures === 'number' ? result.moreFailures : 0)
+    failingTests = lastFailures !== undefined && failures < lastFailures ? 1 : failingTests + 1
+    lastFailures = failures
+    if (failingTests >= 3) {
+      failingTests = 0
+      stuck('tests_failing', `run_tests failed 3 times in a row without fewer failures (${failures} failing)`)
+    }
+  }
 
   const warnAt = Math.ceil(maxSteps * 0.8)
   ctx.emit({ type: 'run.started', mode: ctx.mode, model: provider.model })
@@ -313,6 +333,7 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
         return finish({ status: 'completed', ...extra })
       }
 
+      let badTurn = cutCalls.size > 0
       for (const call of toolCalls) {
         if (ctx.signal.aborted) {
           // Every tool call needs a result or the history is invalid on resume.
@@ -330,13 +351,22 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
         if (refusal) {
           ctx.emit({ type: 'tool.failed', callId: call.id, name: call.name, error: 'refused: the agent is repeating itself' })
           messages.push({ role: 'tool_result', toolCallId: call.id, content: `ERROR: ${refusal}`, isError: true })
+          stuck('loop', refusal)
           continue
         }
-        const resultMessage = await executeCall(call, registry, ctx, hooks)
+        const out: CallOutcome = {}
+        const resultMessage = await executeCall(call, registry, ctx, hooks, out)
+        if (out.invalid) badTurn = true
+        if (call.name === 'run_tests' && out.result !== undefined) trackTests(asRecord(out.result))
         if (EDIT_TOOLS.has(call.name) && !resultMessage.isError) sameCalls.clear() // re-running tests after an edit is not a loop
         if (EDIT_TOOLS.has(call.name) && !resultMessage.isError) edited = true
         if (call.name === 'run_tests' || (call.name === 'run_command' && TEST_COMMAND.test(call.argumentsJson))) testsRan = true
         messages.push(resultMessage)
+      }
+      badTurns = badTurn ? badTurns + 1 : 0
+      if (badTurns >= 2) {
+        badTurns = 0
+        stuck('invalid_calls', 'the model sent cut-off or invalid tool calls 2 turns in a row')
       }
       // Once per run: files changed and no tests ran yet, and the project has a test runner.
       if (edited && !testsRan && !testNudged && registry.get('run_tests')) {
@@ -379,19 +409,30 @@ export async function runAgentLoop(opts: AgentLoopOptions): Promise<AgentResult>
   }
 }
 
+/** What executeCall saw, for the stuck signals: a call the model got wrong, and the tool's raw result. */
+interface CallOutcome {
+  invalid?: boolean
+  result?: unknown
+}
+
 async function executeCall(
   call: ToolCallRequest,
   registry: ToolRegistry,
   ctx: ToolContext,
   hooks: HookDispatcher,
+  out: CallOutcome = {},
 ): Promise<ChatMessage> {
   const fail = (error: string): ChatMessage => {
     ctx.emit({ type: 'tool.failed', callId: call.id, name: call.name, error })
     return { role: 'tool_result', toolCallId: call.id, content: `ERROR: ${error}`, isError: true }
   }
+  const invalid = (error: string): ChatMessage => {
+    out.invalid = true
+    return fail(error)
+  }
 
   const tool = registry.get(call.name)
-  if (!tool) return fail(`unknown tool "${call.name}"`)
+  if (!tool) return invalid(`unknown tool "${call.name}"`)
 
   ctx.emit({ type: 'tool.started', callId: call.id, name: call.name, summary: describeCall(call) })
 
@@ -399,7 +440,7 @@ async function executeCall(
   try {
     rawInput = JSON.parse(call.argumentsJson || '{}')
   } catch {
-    return fail(`arguments are not valid JSON`)
+    return invalid(`arguments are not valid JSON`)
   }
 
   // Validates the model's arguments, and again any input a plugin or hook rewrote (L17).
@@ -411,7 +452,7 @@ async function executeCall(
     return { ok: false, error: `invalid ${what} for "${call.name}" — ${issues}` }
   }
   const checked = validate(rawInput, 'arguments')
-  if (!checked.ok) return fail(checked.error)
+  if (!checked.ok) return invalid(checked.error)
   let input = checked.value
   let hookContext: string[] = []
 
@@ -437,6 +478,7 @@ async function executeCall(
       ? { ...ctx, requestApproval: (req) => ctx.requestApproval({ ...req, title: `${req.title} (after reading web/MCP content)` }) }
       : ctx
     const result = await tool.execute(input as never, toolCtx)
+    out.result = result
     if (tool.risk === 'NETWORK') ctx.state.tainted = true
     hookContext = [...pre.context, ...(await hooks.postToolUse(tool.name, input, call.id, { result })).context]
 
