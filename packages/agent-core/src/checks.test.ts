@@ -189,6 +189,16 @@ describe('run_tests', () => {
     expect(parseFailures('node', ['✖ failing tests:', '', 'test at n.test.mjs:3:1', '✖ adds (1.37ms)', '  AssertionError: 3 !== 4'])).toEqual([
       { name: 'adds', location: 'n.test.mjs:3:1', message: 'AssertionError: 3 !== 4' },
     ])
+    // Node 22 prints TAP when stdout is not a terminal (captured from `node --test --test-reporter=tap`).
+    const tap = [
+      'TAP version 13', '# Subtest: adds', 'not ok 1 - adds', '  ---', '  duration_ms: 1.378', "  type: 'test'",
+      "  location: 'C:\\\\repo\\\\n.test.mjs:3:1'", "  failureType: 'testCodeFailure'", '  error: |-',
+      '    Expected values to be strictly equal:', '    ', '    3 !== 4', "  code: 'ERR_ASSERTION'", "  name: 'AssertionError'",
+      '  expected: 4', '  ...', '# Subtest: ok', 'ok 2 - ok', '  ---', '  ...', '1..2',
+    ]
+    expect(parseFailures('node', tap)).toEqual([
+      { name: 'adds', location: 'C:\\repo\\n.test.mjs:3:1', message: 'AssertionError: Expected values to be strictly equal:' },
+    ])
   })
 
   it('puts filters in each runner syntax, after -- for npm', () => {
