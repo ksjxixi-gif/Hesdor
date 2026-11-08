@@ -85,6 +85,14 @@
         "failIfUnavailable": { "type": "boolean" }
       },
       "additionalProperties": false
+    },
+    "sessions": {
+      "type": "object",
+      "description": "Saved transcripts. Default: kept forever.",
+      "properties": {
+        "retainDays": { "type": "number", "exclusiveMinimum": 0, "description": "At startup, delete transcripts of every workspace not updated for this many days." }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
