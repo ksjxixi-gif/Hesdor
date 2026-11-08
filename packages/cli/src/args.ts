@@ -11,6 +11,8 @@ export interface CliFlags {
   maxBudgetUsd?: number
   /** Reasoning effort sent to the model. */
   effort?: 'low' | 'medium' | 'high'
+  /** Model profile: picks the main model and roles by which keys are set (profiles.ts). */
+  profile?: 'economy' | 'balanced' | 'frontier'
   /** Output token ceiling per model call. */
   maxTokens?: number
   /** Load this repository's plugins and MCP servers without asking. */
@@ -148,6 +150,8 @@ Options:
   -m, --model <model>          Model id for the provider
       --base-url <url>         Override the provider endpoint
       --effort <level>         Reasoning effort: low | medium | high
+      --profile <name>         economy | balanced | frontier: pick the model
+                               and roles from the keys you have (docs/roles.md)
       --max-tokens <n>         Output token limit per model call (default 8192,
                                or maxTokens in config.json)
       --mode <mode>            Interactive default mode: build | plan | ask
@@ -381,6 +385,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
         const effort = needValue(arg)
         if (effort !== 'low' && effort !== 'medium' && effort !== 'high') throw new Error(`invalid --effort "${effort}" (low | medium | high)`)
         flags.effort = effort
+        break
+      }
+      case '--profile': {
+        const profile = needValue(arg)
+        if (profile !== 'economy' && profile !== 'balanced' && profile !== 'frontier') throw new Error(`invalid --profile "${profile}" (economy | balanced | frontier)`)
+        flags.profile = profile
         break
       }
       case '--max-tokens': {
