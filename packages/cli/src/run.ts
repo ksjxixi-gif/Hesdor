@@ -139,8 +139,8 @@ export interface TurnOptions {
   sessionId?: string
   /** Images attached to the prompt (see images.ts). */
   images?: ChatImage[]
-  /** Model roles from resolveRoles: small (compaction), subagent, fallback chain, guardian. */
-  roles?: Partial<Pick<Roles, 'small' | 'subagent' | 'fallback' | 'guardian'>>
+  /** Model roles from resolveRoles: small (compaction), subagent, fallback chain, escalation ladder, guardian. */
+  roles?: Partial<Pick<Roles, 'small' | 'subagent' | 'fallback' | 'escalation' | 'guardian'>>
 }
 
 /** Errors that move the rest of a turn to the next roles.fallback model. */
@@ -159,6 +159,15 @@ export interface TurnResult extends Omit<AgentResult, 'status'> {
   text: string
   /** Provider error class (auth, rate_limit, network, ...) when the provider failed the run. */
   errorKind?: string
+  /** Switches to a stronger model because the run was stuck (`step`: the main-loop step it happened in). */
+  escalations?: Escalation[]
+}
+
+export interface Escalation {
+  from: string
+  to: string
+  reason: string
+  step: number
 }
 
 /** One agent turn with the explore subagent wired in; usage includes the subagent's tokens. */
@@ -197,6 +206,14 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const chain = [raw, ...(opts.roles?.fallback ?? [])].map(priced)
   let active = 0
   let failures = 0
+  /** The rest of this turn uses chain[active + 1]; one path for both triggers (provider failure, stuck run). */
+  const advance = (type: 'provider.fallback' | 'provider.escalated', reason: string): { from: string; to: string } => {
+    const from = chain[active]!
+    const to = chain[++active]!
+    const names = { from: `${from.name}/${from.model}`, to: `${to.name}/${to.model}` }
+    opts.emit({ type, ...names, reason })
+    return names
+  }
   const inner: ModelProvider = {
     name: raw.name,
     model: raw.model,
@@ -217,9 +234,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           // Retryable errors switch only once the loop's own retries are used up.
           if (e?.retryable === true && ++failures < MAX_ATTEMPTS) throw err
           failures = 0
-          active++
-          const to = chain[active]!
-          opts.emit({ type: 'provider.fallback', from: `${p.name}/${p.model}`, to: `${to.name}/${to.model}`, reason: String(e?.kind) })
+          advance('provider.fallback', String(e?.kind))
         }
       }
     },
@@ -274,6 +289,18 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
   const requestApproval = guardian && guard ? guardApproval(guardian, opts.requestApproval, guard) : opts.requestApproval
   const reviewChange = guardian && guard && opts.reviewChange ? guardReview(guardian, opts.reviewChange, guard) : opts.reviewChange
   const small = opts.roles?.small && priced(opts.roles.small)
+  // Escalation: a stuck run (loop.ts run.stuck) moves to the next stronger model, at most twice per turn and
+  // never back down. The new model gets two steps before it can count as stuck itself.
+  const ladder = (opts.roles?.escalation ?? []).filter((p) => p.name !== raw.name || p.model !== raw.model).slice(0, 2)
+  const escalations: Escalation[] = []
+  let calmUntil = 0
+  const escalate = (reason: string): void => {
+    const next = ladder[escalations.length]
+    if (!next || steps < calmUntil) return
+    chain.splice(active + 1, 0, priced(next))
+    escalations.push({ ...advance('provider.escalated', reason), reason, step: steps })
+    calmUntil = steps + 2
+  }
   const subRole = opts.roles?.subagent && priced(opts.roles.subagent)
   const ctx: ToolContext = {
     root: opts.root,
@@ -286,6 +313,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
         if (event.content.trim() !== '') lastText = event.content
       }
       opts.emit(event)
+      if (event.type === 'run.stuck') escalate(event.reason)
     },
     requestApproval,
     approvalsEnabled: opts.approvalsEnabled,
@@ -372,6 +400,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     steps,
     text: lastText,
     ...(errorKind ? { errorKind } : {}),
+    ...(escalations.length > 0 ? { escalations } : {}),
   }
 }
 
