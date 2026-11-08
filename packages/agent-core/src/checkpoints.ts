@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdir, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { RunEvent } from '@hesdor/protocol'
 import { runGit } from './git.js'
@@ -62,7 +62,11 @@ interface Meta {
   turnIndex: number
   prompt: string
   createdAt: number
+  /** Ids this commit had before pruning rewrote the chain, so ids a running session holds still rewind. */
+  was?: string[]
 }
+
+const commitMessage = (meta: Meta): string => `hesdor ${meta.kind}\n\n${JSON.stringify(meta)}\n`
 
 function shadowDir(root: string, baseDir: string): string {
   const real = realPathOf(root)
@@ -116,8 +120,7 @@ class Shadow {
     await this.git(['add', '-A', '--', '.'])
     const tree = (await this.git(['write-tree'])).trim()
     const parent = await this.head()
-    const msg = `hesdor ${meta.kind}\n\n${JSON.stringify(meta)}\n`
-    const commit = (await this.git(['commit-tree', tree, ...(parent ? ['-p', parent] : []), '-m', msg])).trim()
+    const commit = (await this.git(['commit-tree', tree, ...(parent ? ['-p', parent] : []), '-m', commitMessage(meta)])).trim()
     await this.git(['update-ref', REF, commit])
     return commit
   }
@@ -131,15 +134,15 @@ class Shadow {
   }
 
   /** Commits on REF, newest first, with their metadata. */
-  async log(limit = 2000): Promise<Array<{ id: string; meta: Meta }>> {
+  async log(limit = 2000): Promise<Array<{ id: string; tree: string; meta: Meta }>> {
     if (!(await this.head())) return []
-    const out = await this.git(['log', `-${limit}`, '--format=%H%x1f%b%x1e', REF])
-    const entries: Array<{ id: string; meta: Meta }> = []
+    const out = await this.git(['log', `-${limit}`, '--format=%H%x1f%T%x1f%b%x1e', REF])
+    const entries: Array<{ id: string; tree: string; meta: Meta }> = []
     for (const record of out.split('\x1e')) {
-      const [id, body] = record.trim().split('\x1f')
-      if (!id || !body) continue
+      const [id, tree, body] = record.trim().split('\x1f')
+      if (!id || !tree || !body) continue
       try {
-        entries.push({ id, meta: JSON.parse(body) as Meta })
+        entries.push({ id, tree, meta: JSON.parse(body) as Meta })
       } catch {
         // not one of ours
       }
@@ -172,6 +175,14 @@ const shadowFor = (root: string, opts: CheckpointOptions = {}): Shadow =>
 const message = (err: unknown): string => (err instanceof Error ? err.message : String(err))
 const warnedRoots = new Set<string>()
 
+/** Snapshots, rewinds and prunes of one shadow repo run one at a time in this process: gc --prune=now must not drop objects a snapshot is still writing. */
+const queues = new Map<string, Promise<unknown>>()
+function serialized<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+  const run = (queues.get(dir) ?? Promise.resolve()).then(fn)
+  queues.set(dir, run.catch(() => {}))
+  return run
+}
+
 /**
  * Snapshot the workspace before a user turn runs, so the turn can be rewound. Call it at
  * the start of every turn (run.ts does). Never throws: a workspace that is too large or a
@@ -202,8 +213,12 @@ export async function endTurnCheckpoint(root: string, sessionId: string, turnInd
   await snapshotWorkspace(root, { kind: 'end', sessionId, turnIndex, prompt: '', createdAt: Date.now() }, opts)
 }
 
-async function snapshotWorkspace(root: string, meta: Meta, opts: CheckpointOptions): Promise<{ id: string } | { skipped: string }> {
+function snapshotWorkspace(root: string, meta: Meta, opts: CheckpointOptions): Promise<{ id: string } | { skipped: string }> {
   const shadow = shadowFor(root, opts)
+  return serialized(shadow.dir, () => snapshotNow(shadow, meta, opts))
+}
+
+async function snapshotNow(shadow: Shadow, meta: Meta, opts: CheckpointOptions): Promise<{ id: string } | { skipped: string }> {
   try {
     await shadow.init()
     const maxFiles = opts.maxFiles ?? MAX_FILES
@@ -244,8 +259,13 @@ export async function listCheckpoints(root: string, opts: CheckpointOptions & { 
 export async function rewindFiles(root: string, checkpointId: string, opts: CheckpointOptions = {}): Promise<RewindResult> {
   if (!/^[0-9a-f]{7,64}$/i.test(checkpointId)) throw new Error(`invalid checkpoint id "${checkpointId}"`)
   const shadow = shadowFor(root, opts)
+  return serialized(shadow.dir, () => rewindNow(shadow, checkpointId))
+}
+
+async function rewindNow(shadow: Shadow, checkpointId: string): Promise<RewindResult> {
   const history = await shadow.log()
-  const targetAt = history.findIndex((e) => e.id === checkpointId || e.id.startsWith(checkpointId.toLowerCase()))
+  const isId = (id: string): boolean => id === checkpointId || id.startsWith(checkpointId.toLowerCase())
+  const targetAt = history.findIndex((e) => isId(e.id) || e.meta.was?.some(isId))
   if (targetAt < 0) throw new Error(`no checkpoint ${checkpointId} for this workspace`)
   const target = history[targetAt]!.id
 
@@ -268,4 +288,95 @@ export async function rewindFiles(root: string, checkpointId: string, opts: Chec
     drift: changes.filter((c) => outside.has(c.path)).map((c) => c.path),
     backupId,
   }
+}
+
+export interface PruneOptions extends CheckpointOptions {
+  /** Turn checkpoints kept per workspace, newest first (default 100). */
+  keep?: number
+  /** Checkpoints older than this many days are dropped (default 30). */
+  maxAgeDays?: number
+  now?: number
+}
+
+export interface PruneResult {
+  /** Turn checkpoints removed and kept. */
+  removed: number
+  kept: number
+}
+
+const KEEP = 100
+const MAX_AGE_DAYS = 30
+const DAY_MS = 86_400_000
+const STAMP = 'hesdor-pruned'
+
+/** Apply the retention limits to one workspace's checkpoints now. */
+export function pruneCheckpoints(root: string, opts: PruneOptions = {}): Promise<PruneResult> {
+  const shadow = shadowFor(root, opts)
+  return serialized(shadow.dir, () => pruneNow(shadow, opts))
+}
+
+/** Prune every workspace's shadow repo in the store, including those of deleted projects. */
+export async function pruneAllCheckpoints(opts: PruneOptions = {}): Promise<PruneResult & { repos: number; failed: string[] }> {
+  const base = path.join(opts.baseDir ?? hesdorGlobalDir(), 'checkpoints')
+  const total = { removed: 0, kept: 0, repos: 0, failed: [] as string[] }
+  for (const entry of await readdir(base, { withFileTypes: true }).catch(() => [])) {
+    if (!entry.isDirectory()) continue // a symlink is not followed
+    const dir = path.join(base, entry.name)
+    try {
+      // Rewriting history needs no work tree; the shadow dir stands in for it.
+      const r = await serialized(dir, () => pruneNow(new Shadow(dir, dir), opts))
+      total.removed += r.removed
+      total.kept += r.kept
+      total.repos++
+    } catch (err) {
+      total.failed.push(`${entry.name}: ${message(err)}`)
+    }
+  }
+  return total
+}
+
+/**
+ * Session-start retention, at most once a day per workspace (a stamp file in its shadow repo).
+ * Never throws; callers do not await it.
+ */
+export async function autoPruneCheckpoints(root: string, opts: PruneOptions = {}): Promise<PruneResult | undefined> {
+  try {
+    const shadow = shadowFor(root, opts)
+    const stamp = path.join(shadow.dir, STAMP)
+    const last = await stat(stamp).then((s) => s.mtimeMs, () => 0)
+    if ((opts.now ?? Date.now()) - last < DAY_MS) return undefined
+    await stat(path.join(shadow.dir, 'HEAD')) // no checkpoints yet: nothing to do
+    await writeFile(stamp, '') // before pruning, so a failing prune is not retried on every start
+    return await pruneCheckpoints(root, opts)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Keep the newest `keep` turn checkpoints younger than `maxAgeDays`: the chain is rebuilt from the
+ * kept commits (same trees and metadata, old ids recorded in `was`) and swapped in only if no other
+ * process moved it meanwhile, then `git gc --prune=now` frees the space.
+ * shortcut: another hesdor process snapshotting this workspace during the gc can lose that one snapshot; prune runs at most daily.
+ */
+async function pruneNow(shadow: Shadow, opts: PruneOptions): Promise<PruneResult> {
+  const head = await shadow.head()
+  if (!head) return { removed: 0, kept: 0 }
+  const keep = opts.keep ?? KEEP
+  const oldest = (opts.now ?? Date.now()) - (opts.maxAgeDays ?? MAX_AGE_DAYS) * DAY_MS
+  const history = await shadow.log(1_000_000_000)
+  const starts = (entries: typeof history): number => entries.filter((e) => e.meta.kind === 'start').length
+  let seen = 0
+  const cut = history.findIndex((e) => e.meta.createdAt < oldest || (e.meta.kind === 'start' && ++seen > keep))
+  if (cut < 0) return { removed: 0, kept: starts(history) }
+  const kept = history.slice(0, cut)
+  let parent: string | null = null
+  for (const e of [...kept].reverse()) {
+    const meta: Meta = { ...e.meta, was: [...(e.meta.was ?? []), e.id] }
+    parent = (await shadow.git(['commit-tree', e.tree, ...(parent ? ['-p', parent] : []), '-m', commitMessage(meta)])).trim()
+  }
+  // Compare-and-swap on the old head: if another process added a checkpoint, this fails and nothing is lost.
+  await shadow.git(parent ? ['update-ref', REF, parent, head] : ['update-ref', '-d', REF, head])
+  await shadow.git(['gc', '--prune=now', '--quiet'], 600_000)
+  return { removed: starts(history.slice(cut)), kept: starts(kept) }
 }
