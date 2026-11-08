@@ -1,8 +1,26 @@
+import { stat } from 'node:fs/promises'
+import { chatgptAuthFile } from '@hesdor/providers'
 import type { CliFlags } from './args.js'
+import { authFile } from './auth.js'
+import { configFile } from './config.js'
 import type { HesdorConfig } from './config.js'
 import type { Layer } from './config-layers.js'
 import { resolveSelection } from './provider-setup.js'
 import type { ProviderSelection } from './provider-setup.js'
+
+/**
+ * Candidate lookups, cached for the process: loadEffectiveConfig runs several times per turn and each
+ * lookup reads auth.json and the ChatGPT sign-in. Reused while config.json, auth.json and the ChatGPT
+ * auth file keep their mtime and size and the merged config, flags and environment are unchanged.
+ */
+let selections: { key: string; map: Map<string, Promise<ProviderSelection | undefined>> } | undefined
+
+async function selectionCache(cfg: HesdorConfig, flags: Partial<CliFlags>): Promise<Map<string, Promise<ProviderSelection | undefined>>> {
+  const files = await Promise.all([configFile(), authFile(), chatgptAuthFile()].map((f) => stat(f).then((s) => `${s.mtimeMs}:${s.size}`, () => '-')))
+  const key = JSON.stringify([files, cfg, flags, process.env])
+  if (selections?.key !== key) selections = { key, map: new Map() }
+  return selections.map
+}
 
 /**
  * Ranked `provider/model` candidates per tier. A tier uses the first candidate whose provider has a
@@ -119,7 +137,7 @@ export async function applyProfile(
   const name = cfg.profile as ProfileName
   const profile = PROFILES[name]
   const { provider: _provider, model: _model, baseUrl: _baseUrl, ...own } = eff.flags
-  const cache = new Map<string, Promise<ProviderSelection | undefined>>()
+  const cache = await selectionCache(cfg, own)
   const select = (spec: string): Promise<ProviderSelection | undefined> => {
     const slash = spec.indexOf('/')
     if (!cache.has(spec)) cache.set(spec, resolveSelection({ ...own, provider: spec.slice(0, slash), model: spec.slice(slash + 1) }, cfg).catch(() => undefined))
