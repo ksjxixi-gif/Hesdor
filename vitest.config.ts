@@ -1,9 +1,12 @@
 import { fileURLToPath } from 'node:url'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 const pkg = (name: string) => fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url))
 
-export default defineConfig({
+// *.live.test.ts send real, billed requests: only `pnpm test:live` (--mode live) or HESDOR_LIVE=1 runs them.
+export default defineConfig(({ mode }) => {
+  const live = mode === 'live' || process.env.HESDOR_LIVE === '1'
+  return {
   resolve: {
     alias: {
       '@hesdor/protocol': pkg('protocol'),
@@ -12,8 +15,10 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/*/src/**/*.test.ts'],
-    testTimeout: 30000,
+    include: [mode === 'live' ? 'packages/*/src/**/*.live.test.ts' : 'packages/*/src/**/*.test.ts'],
+    exclude: [...configDefaults.exclude, ...(live ? [] : ['**/*.live.test.ts'])],
+    env: live ? { HESDOR_LIVE: '1' } : {},
+    testTimeout: mode === 'live' ? 180_000 : 30000,
     // Used only by `pnpm test:coverage`, which needs the provider installed once:
     //   pnpm add -Dw @vitest/coverage-v8@3   (match the vitest major)
     // Report lands in coverage/ (text summary + lcov). Ratchet: once a baseline exists, add
@@ -25,4 +30,5 @@ export default defineConfig({
       reporter: ['text-summary', 'lcov'],
     },
   },
+  }
 })
