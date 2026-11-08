@@ -36,7 +36,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
-      - run: node --test scripts/release scripts/screens
+      # Globs, not folders: only Node 26 accepts a directory argument to --test.
+      - run: node --test "scripts/release/*.test.mjs" "scripts/screens/*.test.mjs" "scripts/bench/*.test.mjs"
       - run: pnpm build
       - name: Smoke test the bundled CLI
         shell: bash
