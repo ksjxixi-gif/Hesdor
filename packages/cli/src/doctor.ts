@@ -101,6 +101,8 @@ export async function collectDoctorRows(flags: CliFlags): Promise<DoctorRow[]> {
     const keys = Object.keys(managed)
     rows.push({ name: 'Managed settings', ok: true, detail: keys.length ? `${managedSettingsPath()} (${keys.join(', ')})` : `none (${managedSettingsPath()})` })
     for (const w of eff.warnings) rows.push({ name: 'Config', ok: null, detail: w })
+    // What the profile picked and why (its missing-key notes are among the Config warnings above).
+    for (const line of eff.profile?.lines ?? []) rows.push({ name: 'Profile', ok: true, detail: line })
   } catch (err) {
     rows.push({ name: 'Managed settings', ok: false, detail: err instanceof Error ? err.message : String(err) })
   }
