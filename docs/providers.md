@@ -36,6 +36,26 @@ Rate limits, overloads, 5xx and dropped connections are retried up to 4 times wi
 
 A bundled models.dev snapshot gives context limits, prices (including cache read and write tokens) and capabilities. Every request is priced, subagents and model roles included, or the provider's own reported cost is used when it sends one. Headless results carry `cost_usd`, the TUI footer shows session cost and cache hit rate, and `--max-budget-usd <n>` stops a run at the budget (exit code 4). Anthropic requests set prompt-cache breakpoints on the system prompt and the newest message.
 
+## Verify your setup
+
+`hesdor doctor` stays offline. `hesdor doctor --live` also sends three tiny real requests to each provider that has a usable credential (environment or saved key, `apiKeyCommand`, ChatGPT sign-in; local servers only when they answer), one provider at a time:
+
+1. a streamed "reply with the word ok",
+2. a call to a no-argument `get_time` tool,
+3. the tool result sent back (with any reasoning or thinking state the model returned) and the final answer.
+
+For each provider it reports ok or the failed step with the classified error kind and hint, first-token and total latency, tokens, whether usage and cache fields came back, whether reasoning state was replayed, the model, and the cost at catalog prices. Output is capped at 256 tokens per request (1024 for reasoning or unknown models) with a 60-second timeout. It prints a worst-case cost estimate first and asks before sending anything; pass `--yes` to skip the question.
+
+```bash
+hesdor doctor --live                     # every configured provider
+hesdor doctor --live -p deepseek --yes   # one provider, no prompt
+hesdor doctor --live --yes --output-format json
+```
+
+From a source checkout, `pnpm test:live` goes further for every keyed provider: the same check, a two-step `read_file` chain through the real agent loop (replaying reasoning state between steps), prompt-cache fields on a second identical ~5k-token request (Anthropic and Responses wires), and a generated PNG for vision models. Providers without a key are skipped; narrow the run with `pnpm test:live -t anthropic`. Results go to `evals/live/report-<date>.md` (gitignored). `pnpm test` never runs these files.
+
+Expected cost: well under a cent per provider for `doctor --live` on default models, and a few cents per provider for `test:live` (the cache test sends about 10k input tokens). The ChatGPT plan and local servers cost nothing.
+
 ## Saved and custom providers
 
 Run `hesdor setup` to save a preset or your own endpoint, format, model and API key in the user profile. Defaults persist in `%APPDATA%\hesdor\config.json` or `~/.config/hesdor/config.json`; credentials are kept separately in the profile and never inside a repository.
