@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { ToolContext } from '../context.js'
 import { execStreaming, startJob, stopJob, type BackgroundJob } from '../exec.js'
 import { decideCommand, PermissionDeniedError, tokenize } from '../policy.js'
+import { sandboxHint, wrapCommand } from '../sandbox.js'
 import { safeResolve, toRel } from '../paths.js'
 import { defineTool } from './types.js'
 
@@ -17,12 +18,13 @@ const JOB_OUTPUT_LINES = 300
  * Same policy for foreground and background commands (see decideCommand). A `default` ask
  * (no rule, not built-in safe) only applies when the host passed permissions and can ask:
  * headless runs without --yes keep running unclassified commands, as before rules existed.
+ * Inside a working OS sandbox a `default` ask runs without a prompt: the sandbox replaces it.
  */
-async function authorize(argv: string[], command: string, ctx: ToolContext): Promise<void> {
+export async function authorize(argv: string[], command: string, ctx: ToolContext, sandboxed = false): Promise<void> {
   const decision = decideCommand(argv, ctx.permissions)
   if (decision.action === 'allow') return
   if (decision.action === 'deny') throw new PermissionDeniedError(`denied: "${command}" (${decision.reason})`)
-  if (decision.source === 'default' && (!ctx.permissions || !ctx.approvalsEnabled)) return
+  if (decision.source === 'default' && (sandboxed || !ctx.permissions || !ctx.approvalsEnabled)) return
   const kind = decision.source === 'built-in' ? decision.reason.split(':')[0]! : 'EXECUTE'
   if (!ctx.approvalsEnabled) {
     throw new PermissionDeniedError(
@@ -93,23 +95,28 @@ export const runCommandTool = defineTool({
   async execute(input, ctx) {
     const argv = tokenize(input.command)
     if (argv.length === 0) throw new Error('empty command')
-    await authorize(argv, input.command, ctx)
-
     const cwdAbs = safeResolve(ctx.root, input.cwd && input.cwd.trim() !== '' ? input.cwd : '.')
     const cwd = toRel(ctx.root, cwdAbs) || '.'
+    const run = wrapCommand(argv, ctx.sandbox, ctx.root, cwdAbs)
+    await authorize(argv, input.command, ctx, run.sandboxed)
+    const hint = (exitCode: number | null, output: string): { sandbox?: string } => {
+      const note = run.sandboxed && exitCode !== 0 && ctx.sandbox ? sandboxHint(ctx.sandbox, output) : undefined
+      return note ? { sandbox: note } : {}
+    }
 
     if (input.background) {
       const jobs = (ctx.state.jobs ??= new Map())
       const running = [...jobs.values()].filter((j) => j.running).length
       if (running >= MAX_RUNNING_JOBS) throw new Error(`${running} background jobs are running; stop one with job_stop first`)
-      const job = startJob(`job${jobs.size + 1}`, input.command, argv, cwdAbs)
+      const job = startJob(`job${jobs.size + 1}`, input.command, run.argv, cwdAbs)
       jobs.set(job.id, job)
       await waitUntil(JOB_STARTUP_WAIT_MS, () => !job.running, ctx.signal)
-      return { ...jobStatus(job), cwd, ...takeOutput(job) }
+      const out = takeOutput(job)
+      return { ...jobStatus(job), cwd, ...out, ...(job.running ? {} : hint(job.exitCode, out.output)) }
     }
 
     const timeoutMs = Math.min(input.timeout_ms ?? DEFAULT_TIMEOUT_MS, MAX_TIMEOUT_MS)
-    const result = await execStreaming(argv, {
+    const result = await execStreaming(run.argv, {
       cwd: cwdAbs,
       signal: ctx.signal,
       timeoutMs,
@@ -128,6 +135,7 @@ export const runCommandTool = defineTool({
       timedOut: result.timedOut,
       stdout: result.stdoutTail.join('\n'),
       stderr: result.stderrTail.join('\n'),
+      ...hint(result.exitCode, [...result.stdoutTail, ...result.stderrTail].join('\n')),
     }
   },
 })
