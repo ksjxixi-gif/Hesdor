@@ -54,6 +54,7 @@ pnpm --filter @dean_overlord/hesdor link --global
 cd your-project                  # any git repository
 hesdor setup                     # pick a provider and save a key (or: export OPENAI_API_KEY=...)
 hesdor doctor                    # check node, git, ripgrep, provider and credentials
+hesdor doctor --live             # optional: 3 tiny real requests per configured provider (asks first, usually under a cent)
 hesdor init                      # optional: HESDOR.md and .hesdorignore starters
 
 hesdor                           # interactive TUI
