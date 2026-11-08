@@ -51,6 +51,8 @@ export interface Roles {
   subagent?: ModelProvider
   /** Tried in order when the main model fails with overloaded, rate_limit, quota_exhausted or network. */
   fallback: ModelProvider[]
+  /** Stronger models, in order, for a stuck run (roles.escalation; off with `escalate: false`). */
+  escalation?: ModelProvider[]
   /** Set when the guardian is on for this session (interactive: guardian.enabled; headless: --guardian). */
   guardian?: Guardian
   /** One per configured role, for `hesdor doctor`. */
@@ -94,6 +96,11 @@ export async function resolveRoles(flags: CliFlags, cfg: HesdorConfig, current: 
   for (const [i, spec] of fallback.entries()) {
     const provider = await resolve(`fallback ${i + 1}`, spec)
     if (provider) roles.fallback.push(provider)
+  }
+  const escalation = cfg.escalate === false || cfgRoles.escalation === undefined ? [] : Array.isArray(cfgRoles.escalation) ? cfgRoles.escalation : [cfgRoles.escalation]
+  for (const [i, spec] of escalation.entries()) {
+    const provider = await resolve(`escalation ${i + 1}`, spec)
+    if (provider) (roles.escalation ??= []).push(provider)
   }
 
   // The guardian runs headless only when --guardian is passed explicitly (and is moot with --yes).
