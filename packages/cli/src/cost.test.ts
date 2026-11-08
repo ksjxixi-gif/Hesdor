@@ -83,6 +83,15 @@ describe('--max-budget-usd', () => {
     expect(result.cost_usd).toBeCloseTo(perRequest, 12)
   })
 
+  it('counts the --goal evaluator cost against the budget', async () => {
+    const verdict = answer('{"verdict": "not_yet", "reason": "more"}')
+    const provider = new ScriptedProvider([answer('one'), verdict, answer('never sent')])
+    const { code, result } = await run(provider, flags({ goal: 'done', maxBudgetUsd: 1.5 * perRequest }))
+    expect(code).toBe(4)
+    expect(provider.requests).toHaveLength(2)
+    expect(result.cost_usd).toBeCloseTo(2 * perRequest, 12)
+  })
+
   it('runs to completion under the budget', async () => {
     const { code } = await run(new ScriptedProvider([call('c1', 'list_files', {}), answer('done')]), flags({ maxBudgetUsd: 100 }))
     expect(code).toBe(0)
