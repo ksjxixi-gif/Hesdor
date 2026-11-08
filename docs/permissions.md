@@ -85,6 +85,8 @@ A repository's `.hesdor/plugins/*.js`, `.hesdor/hooks.json`, `.hesdor/mcp.json`,
 
 Before each turn Hesdor snapshots the workspace into a shadow Git repository in your config directory (never your project's `.git`), covering shell-command edits and binary files. `/rewind` restores files, the conversation, or both, to an earlier turn, warns about files you edited by hand since, and can undo the last rewind. `/undo` and `/redo` revert or re-apply the agent's last file change.
 
+Each workspace keeps at most its newest 100 checkpoints, and none older than 30 days. Hesdor prunes in the background when a session starts, at most once a day per workspace, and runs `git gc --prune=now` on the shadow repository only when something was removed. `hesdor checkpoints` lists this workspace's checkpoints; `hesdor checkpoints prune` applies the limits now, and `--all` does it for every workspace in the store (including projects you have deleted).
+
 ## Files on disk
 
 Credentials and saved session transcripts are written with mode `0600` in a `0700` directory. Config, credentials and sessions are written through a temp file and rename; a malformed JSON config stops with an error instead of being overwritten.
