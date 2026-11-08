@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { formatRead, formatReadFiles } from './tools/fs.js'
 
@@ -75,4 +75,28 @@ export async function capOutput(text: string, root: string, callId: string, max 
     where = 'full output could not be saved'
   }
   return `${text.slice(0, headEnd)}\n[… ${lines} lines omitted, ${where} …]\n${text.slice(tailStart)}`
+}
+
+/**
+ * Delete spill files older than `maxAgeMs` (default 7 days) from `<root>/.hesdor/out`. Only regular
+ * files directly in that directory; symlinks (the directories on the way included) are never followed.
+ * Returns how many were deleted; never throws.
+ */
+export async function cleanSpillDir(root: string, maxAgeMs = 7 * 86_400_000, now = Date.now()): Promise<number> {
+  const dir = path.join(root, SPILL_DIR)
+  let removed = 0
+  try {
+    for (const d of [path.dirname(dir), dir]) if (!(await lstat(d)).isDirectory()) return 0
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (!entry.isFile() || entry.name === '.gitignore') continue
+      const file = path.join(dir, entry.name)
+      if (now - (await lstat(file)).mtimeMs > maxAgeMs) {
+        await unlink(file)
+        removed++
+      }
+    }
+  } catch {
+    // missing directory or a file that vanished: nothing to clean
+  }
+  return removed
 }
