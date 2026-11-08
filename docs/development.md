@@ -27,7 +27,7 @@ See [architecture.md](architecture.md) for the package layout and the flow of on
 
 ```bash
 node scripts/bench/matrix.mjs evals/matrix/tb21-smoke.json   # dry run: commands + cost estimate
-node --test scripts/bench                                    # aggregation math, command generation, SVG
+node --test "scripts/bench/*.test.mjs"                                  # aggregation math, command generation, SVG
 ```
 
 ## Screenshots
@@ -38,7 +38,7 @@ The images in the README and these docs are generated, not hand-drawn. `scripts/
 pnpm build
 node scripts/screens/capture-headless.mjs   # headless run, doctor, policy check, --help
 node scripts/screens/capture-tui.mjs        # TUI frames at 120x30
-node --test scripts/screens                 # tests for the ANSI to SVG converter
+node --test "scripts/screens/*.test.mjs"               # tests for the ANSI to SVG converter
 ```
 
 `ansi-to-svg.mjs` is dependency-free and works on any captured ANSI text: `node scripts/screens/ansi-to-svg.mjs in.ans out.svg --cols 100 --title "my shot"`.
@@ -67,7 +67,7 @@ There is no cross-building, because a macOS binary has to be re-signed on macOS 
 pnpm build
 node scripts/release/build-binaries.mjs                         # dist/release/hesdor-<target>.zip|.tar.gz
 node scripts/release/smoke-binary.mjs dist/release/work/hesdor.exe   # --version, --help, doctor, headless run against a fake model
-node --test scripts/release                                     # manifests, install.ps1 and install.sh against a fake local release
+node --test "scripts/release/*.test.mjs"                                   # manifests, install.ps1 and install.sh against a fake local release
 ```
 
 ### Install scripts
