@@ -2,7 +2,7 @@ import path from 'node:path'
 import { decideCommand, findGitRoot, ruleToString, tokenize, validateRules } from '@hesdor/agent-core'
 import type { PermissionPolicy, PermissionRules } from '@hesdor/agent-core'
 import { configDir, loadConfig, readJsonObject, saveConfig } from './config.js'
-import { loadManagedSettings } from './config-layers.js'
+import { loadManagedSettings, managedSettingsPath } from './config-layers.js'
 
 /** Project rules file: `{ "ask": [...], "deny": [...] }`. It can only tighten. */
 export const PROJECT_PERMISSIONS = path.join('.hesdor', 'permissions.json')
@@ -20,11 +20,10 @@ async function readProjectRules(root: string): Promise<PermissionRules> {
 export async function loadPermissions(root: string): Promise<PermissionPolicy> {
   const user = validateRules((await loadConfig()).permissions, path.join(configDir(), 'config.json'))
   const project = await readProjectRules(root)
-  // Managed ask/deny rules ride in the tighten-only slot, which nothing can loosen.
-  const managed = (await loadManagedSettings()).permissions ?? {}
-  const ask = [...(project.ask ?? []), ...(managed.ask ?? [])]
-  const deny = [...(project.deny ?? []), ...(managed.deny ?? [])]
-  return { user, project: { ...(ask.length ? { ask } : {}), ...(deny.length ? { deny } : {}) } }
+  // Managed rules are ask/deny only (validated in loadManagedSettings), so nothing can loosen them.
+  const managed = (await loadManagedSettings()).permissions
+  const { ask, deny } = project
+  return { user, project: { ...(ask ? { ask } : {}), ...(deny ? { deny } : {}) }, ...(managed ? { managed } : {}) }
 }
 
 const sameArgv = (rule: unknown, argv: string[]): boolean =>
@@ -61,7 +60,13 @@ export async function runPolicyCommand(args: string[], cwd = process.cwd()): Pro
   }
   const d = decideCommand(argv, policy)
   const where =
-    d.source === 'user' ? path.join(configDir(), 'config.json') : d.source === 'project' ? path.join(root, PROJECT_PERMISSIONS) : null
+    d.source === 'user'
+      ? path.join(configDir(), 'config.json')
+      : d.source === 'project'
+        ? path.join(root, PROJECT_PERMISSIONS)
+        : d.source === 'managed'
+          ? managedSettingsPath()
+          : null
   const effect =
     d.action === 'allow'
       ? 'runs without asking'
