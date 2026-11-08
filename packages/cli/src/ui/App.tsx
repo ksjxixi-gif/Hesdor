@@ -3,7 +3,7 @@ import { Box, measureElement, Text, useApp, useInput } from 'ink'
 import type { DOMElement } from 'ink'
 import TextInput from 'ink-text-input'
 import type { ApprovalRequest, Checkpoint, McpElicitRequest, McpElicitResult, RepoContextInfo, ToolContext } from '@hesdor/agent-core'
-import { listCheckpoints, loginMcpServer, mcpAuthStatus, redoLastChange, rewindFiles, undoLastChange } from '@hesdor/agent-core'
+import { listCheckpoints, loginMcpServer, mcpAuthStatus, redoLastChange, renderTodos, rewindFiles, undoLastChange } from '@hesdor/agent-core'
 import type { AgentMode, ChatMessage, RunEvent } from '@hesdor/protocol'
 import { chatgptSignedIn, fetchModels, getModelInfo, getPreset, PROVIDER_PRESETS, readChatGPTAuth } from '@hesdor/providers'
 import { loadConfig, modelIdError, PROVIDER_ID_RE, saveConfig } from '../config.js'
@@ -418,6 +418,9 @@ export function App({
             pushItem({ kind: 'status', text: `${event.reason} (/rewind is unavailable)`, tone: 'warn' })
           }
           break
+        case 'todo.updated':
+          pushItem({ kind: 'status', text: `plan\n${renderTodos(event.todos)}`, tone: 'info' })
+          break
         case 'context.compacted':
           pushItem({
             kind: 'status',
@@ -583,6 +586,7 @@ export function App({
         const turn = continuingTurn(
           (p, history, emit, first) =>
             runTurn({
+              trustWorkspace: flags.trustWorkspace,
               provider,
               registry: session.registry,
               plugins: session.plugins,
@@ -628,8 +632,9 @@ export function App({
         )
         if (goal === undefined) await turn(prompt, handleEvent)
         else {
-          // shortcut: the evaluator's own cost is not added to the footer total (turns are).
-          const result = await runGoal({ condition: goal, prompt, turn, evaluator: roles.small ?? provider, emit: handleEvent, signal: controller.signal })
+          // The evaluator's cost joins the footer total, which the next turn's budget check reads.
+          const onEvaluatorCost = (usd: number): void => updateStats({ ...statsRef.current, costUsd: (statsRef.current.costUsd ?? 0) + usd })
+          const result = await runGoal({ condition: goal, prompt, turn, evaluator: roles.small ?? provider, emit: handleEvent, signal: controller.signal, onEvaluatorCost })
           pushItem({ kind: 'status', ...goalNotice(result) })
         }
       } catch (err) {
