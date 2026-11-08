@@ -1,13 +1,8 @@
 import { helpText, parseArgs, VERSION } from './args.js'
-import { runDoctor } from './doctor.js'
-import { printInitResult, runInit } from './init.js'
-import { runHeadless } from './headless.js'
-import { runReview } from './review.js'
-import { startInteractive } from './interactive.js'
-import { runModelCommand, runProviderCommand, runSetup } from './setup.js'
-import { runPricing } from './pricing.js'
-import { runAuthCommand } from './auth.js'
-import { runPolicyCommand } from './policy-cmd.js'
+// Every command is imported lazily (the bundle is code-split): --version and --help load only args.js,
+// and only the command that runs pays for agent-core, providers, the SDKs or Ink.
+const headless = () => import('./headless.js')
+const setup = () => import('./setup.js')
 
 export { VERSION }
 
@@ -31,26 +26,28 @@ async function main(): Promise<void> {
   }
 
   switch (parsed.command) {
-    case 'init':
+    case 'init': {
+      const { printInitResult, runInit } = await import('./init.js')
       printInitResult(await runInit(parsed.flags.force))
       return
+    }
     case 'doctor':
-      process.exitCode = await runDoctor(parsed.flags)
+      process.exitCode = await (await import('./doctor.js')).runDoctor(parsed.flags)
       return
     case 'setup':
-      process.exitCode = await runSetup()
+      process.exitCode = await (await setup()).runSetup()
       return
     case 'pricing':
-      process.exitCode = runPricing()
+      process.exitCode = (await import('./pricing.js')).runPricing()
       return
     case 'model':
-      process.exitCode = await runModelCommand(parsed.prompt, parsed.flags)
+      process.exitCode = await (await setup()).runModelCommand(parsed.prompt, parsed.flags)
       return
     case 'provider':
-      process.exitCode = await runProviderCommand(parsed.prompt)
+      process.exitCode = await (await setup()).runProviderCommand(parsed.prompt)
       return
     case 'auth':
-      process.exitCode = await runAuthCommand(parsed.prompt)
+      process.exitCode = await (await import('./auth.js')).runAuthCommand(parsed.prompt)
       return
     case 'login':
       process.exitCode = await (await import('./chatgpt-login.js')).runLoginCommand(parsed.prompt)
@@ -59,13 +56,16 @@ async function main(): Promise<void> {
       process.exitCode = await (await import('./chatgpt-login.js')).runLogoutCommand(parsed.prompt)
       return
     case 'policy':
-      process.exitCode = await runPolicyCommand(parsed.args ?? [])
+      process.exitCode = await (await import('./policy-cmd.js')).runPolicyCommand(parsed.args ?? [])
       return
     case 'mcp':
       process.exitCode = await (await import('./mcp-cmd.js')).runMcpCommand(parsed.args ?? [])
       return
     case 'config':
       process.exitCode = await (await import('./config-layers.js')).runConfigCommand(parsed.args ?? [])
+      return
+    case 'checkpoints':
+      process.exitCode = await (await import('./checkpoints-cmd.js')).runCheckpointsCommand(parsed.args ?? [])
       return
     case 'export':
       process.exitCode = await (await import('./export.js')).runExport(parsed.prompt, parsed.flags)
@@ -81,20 +81,21 @@ async function main(): Promise<void> {
       process.exitCode = await (await import('./acp.js')).runAcp(parsed.flags)
       return
     case 'run':
-      process.exitCode = await runHeadless('build', parsed.prompt, parsed.flags)
+      process.exitCode = await (await headless()).runHeadless('build', parsed.prompt, parsed.flags)
       return
     case 'ask':
-      process.exitCode = await runHeadless('ask', parsed.prompt, parsed.flags)
+      process.exitCode = await (await headless()).runHeadless('ask', parsed.prompt, parsed.flags)
       return
     case 'plan':
-      process.exitCode = await runHeadless('plan', parsed.prompt, parsed.flags)
+      process.exitCode = await (await headless()).runHeadless('plan', parsed.prompt, parsed.flags)
       return
     case 'review':
-      process.exitCode = await runReview(parsed.prompt, parsed.flags)
+      process.exitCode = await (await import('./review.js')).runReview(parsed.prompt, parsed.flags)
       return
     case 'interactive':
       // `hesdor "<prompt>"` opens the TUI and immediately starts that task.
-      process.exitCode = await startInteractive(parsed.flags, parsed.prompt || undefined)
+      // Lazy: Ink/React cost ~0.5 s to load, which headless runs, doctor, --version and --help skip.
+      process.exitCode = await (await import('./interactive.js')).startInteractive(parsed.flags, parsed.prompt || undefined)
       return
   }
 }
