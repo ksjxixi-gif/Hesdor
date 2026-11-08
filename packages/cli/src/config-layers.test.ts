@@ -223,3 +223,14 @@ describe('hesdor config', () => {
     expect(rows).toEqual(expect.arrayContaining([{ key: 'maxTokens', value: 8192, source: 'default' }]))
   })
 })
+
+describe('checks layer', () => {
+  it('a trusted project overrides checks per kind; malformed checks are ignored with a warning', () => {
+    const eff = mergeLayers({ user: { checks: { lint: ['eslint', '{file}'], test: ['npm', 'test'] } }, project: { checks: { test: ['pytest'] } } })
+    expect(eff.config.checks).toEqual({ lint: ['eslint', '{file}'], test: ['pytest'] })
+    expect(eff.sources.checks).toBe('project')
+    const bad = mergeLayers({ user: {}, project: { checks: { lint: 'eslint .' } } })
+    expect(bad.config.checks).toBeUndefined()
+    expect(bad.warnings[0]).toContain('checks lint must be a list')
+  })
+})
