@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:replay": "vitest run packages/agent-core/src/testing packages/providers/src/sse-fixtures.test.ts",
+    "test:live": "vitest run --mode live",
     "bench": "node scripts/bench.mjs",
     "lint": "oxlint packages"
   },
