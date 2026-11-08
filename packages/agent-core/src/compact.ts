@@ -1,4 +1,5 @@
 import type { ChatMessage, ModelProvider, Usage } from '@hesdor/protocol'
+import { renderTodos, todoSchema } from './tools/todo.js'
 
 /** Context window assumed when the model's is unknown. */
 export const DEFAULT_CONTEXT_WINDOW = 128_000
@@ -102,7 +103,7 @@ export async function summarizeHistory(
   }
   if (summary.trim() === '') throw new Error('the model returned an empty summary')
   return {
-    messages: [messages[0]!, { role: 'user', content: `${SUMMARY_PREFIX}\n${summary.trim()}` }, ...messages.slice(cut)],
+    messages: [messages[0]!, { role: 'user', content: `${SUMMARY_PREFIX}\n${summary.trim()}${todoBlock(messages, cut)}` }, ...messages.slice(cut)],
     ...(usage ? { usage } : {}),
   }
 }
@@ -116,4 +117,32 @@ function transcript(messages: ChatMessage[]): string {
       return [`[${m.role}]`, clip(m.content, 8000), ...calls].filter((s) => s !== '').join('\n')
     })
     .join('\n\n')
+}
+
+export const TODO_HEADER = '[current todo list, kept from before the summary]'
+
+/**
+ * The plan the model kept with todo_write, re-attached to the summary when its newest todo_write
+ * call is in the summarized part (the kept part already carries a newer one).
+ */
+function todoBlock(messages: ChatMessage[], cut: number): string {
+  const hasTodo = (m: ChatMessage): boolean => m.toolCalls?.some((c) => c.name === 'todo_write') ?? false
+  if (messages.slice(cut).some(hasTodo)) return ''
+  for (const m of messages.slice(1, cut).reverse()) {
+    for (const call of [...(m.toolCalls ?? [])].reverse()) {
+      if (call.name !== 'todo_write') continue
+      let args: unknown
+      try {
+        args = JSON.parse(call.argumentsJson)
+      } catch {
+        continue
+      }
+      const parsed = todoSchema.safeParse(args)
+      if (parsed.success) return `\n\n${TODO_HEADER}\n${renderTodos(parsed.data.todos)}`
+    }
+    // An earlier summary carries the list re-attached last time.
+    const at = m.role === 'user' && m.content.startsWith(SUMMARY_PREFIX) ? m.content.indexOf(TODO_HEADER) : -1
+    if (at >= 0) return `\n\n${m.content.slice(at)}`
+  }
+  return ''
 }
