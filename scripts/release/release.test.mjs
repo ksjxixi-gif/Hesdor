@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
@@ -151,19 +151,19 @@ describe('install.sh', { skip: !hasSh && 'no sh' }, () => {
     tmp = mkdtempSync(path.join(os.tmpdir(), 'hesdor-sh-'))
     rel = makeRelease(tmp, 'hesdor-linux-x64.tar.gz', 'hesdor', ['-czf'])
     server = await fakeRelease(rel.dir, '9.9.9')
-    // Pretend to be Linux x64 whatever the host is, so the test runs on Windows (Git sh) and macOS too.
-    const bin = path.join(tmp, 'bin')
-    mkdirSync(bin)
-    writeFileSync(path.join(bin, 'uname'), '#!/bin/sh\n[ "$1" = -s ] && echo Linux || echo x86_64\n')
-    chmodSync(path.join(bin, 'uname'), 0o755)
-    env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH}`, HESDOR_BASE_URL: server.url }
+    env = { ...process.env, HESDOR_BASE_URL: server.url }
   })
   after(() => {
     server.close()
     rmSync(tmp, { recursive: true, force: true })
   })
+  // Pretend to be Linux x64 whatever the host is. A shell function beats any `uname` on PATH, which matters
+  // on Windows CI where Git's sh wrapper puts /usr/bin (with the real uname) first.
+  const FAKE_UNAME = 'uname() { if [ "$1" = -s ]; then echo Linux; else echo x86_64; fi; }'
   const install = (dir, version) =>
-    run('sh', [path.join(PACKAGING, 'install.sh').replaceAll('\\', '/')], { env: { ...env, HESDOR_VERSION: version, HESDOR_INSTALL_DIR: dir.replaceAll('\\', '/') } })
+    run('sh', ['-c', `${FAKE_UNAME}; . "$0"`, path.join(PACKAGING, 'install.sh').replaceAll('\\', '/')], {
+      env: { ...env, HESDOR_VERSION: version, HESDOR_INSTALL_DIR: dir.replaceAll('\\', '/') },
+    })
 
   test('installs when the checksum matches', async () => {
     writeFileSync(path.join(rel.dir, 'SHA256SUMS'), rel.good)
