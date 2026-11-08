@@ -194,6 +194,8 @@ export async function collectDoctorRows(flags: CliFlags): Promise<DoctorRow[]> {
 }
 
 export async function runDoctor(flags: CliFlags): Promise<number> {
+  // Opt-in: the only doctor path that sends model requests.
+  if (flags.live) return (await import('./live-check.js')).runDoctorLive(flags)
   const rows = await collectDoctorRows(flags)
   for (const row of rows) {
     const icon = row.ok === true ? '✓' : row.ok === false ? '✗' : '?'
