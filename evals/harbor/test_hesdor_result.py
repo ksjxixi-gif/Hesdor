@@ -41,4 +41,11 @@ assert crash.outcome == "crashed" and crash.exit_code == 139
 noisy = parse_run("warning: something\n" + out(result(), 0))
 assert noisy.outcome == "completed"
 
+# routing profile and escalations (a count or a list of escalation records)
+prof = parse_run(out(result(profile="economy", escalations=2), 0))
+assert (prof.profile, prof.escalations) == ("economy", 2)
+listed = parse_run(out(result(profile="balanced", escalations=[{"from": "a", "to": "b"}]), 0))
+assert listed.escalations == 1
+assert (ok.profile, ok.escalations) == (None, None)
+
 print("ok")
