@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { isSea } from 'node:sea'
 import { VERSION } from './args.js'
 import { configDir, writeFileAtomic } from './config.js'
 import type { HesdorConfig } from './config.js'
@@ -85,10 +86,11 @@ export async function updateCheckStatus(cfg: HesdorConfig): Promise<string> {
   return `on — once a day, interactive only, plain GET of registry.npmjs.org/${PACKAGE_NAME}/latest (${last})`
 }
 
-export type InstallMethod = 'npx' | 'pnpm' | 'npm' | 'source'
+export type InstallMethod = 'npx' | 'pnpm' | 'npm' | 'source' | 'binary'
 
-/** Guess how this copy was installed from the path of the running script. */
-export function detectInstall(script = process.argv[1] ?? ''): InstallMethod {
+/** Guess how this copy was installed: a standalone binary, else from the path of the running script. */
+export function detectInstall(script = process.argv[1] ?? '', binary = isSea()): InstallMethod {
+  if (binary) return 'binary'
   const p = script.replace(/\\/g, '/')
   if (/\/_npx\//.test(p)) return 'npx'
   if (!p.includes('/node_modules/')) return 'source'
@@ -106,6 +108,8 @@ export function upgradeCommand(method: InstallMethod): string {
       return `npm install -g ${PACKAGE_NAME}@latest`
     case 'source':
       return 'git pull && pnpm install && pnpm build   (running from a source checkout)'
+    case 'binary':
+      return 'winget upgrade hesdor | scoop update hesdor | brew upgrade hesdor, or re-run the install script (packaging/install.ps1 or install.sh)'
   }
 }
 
