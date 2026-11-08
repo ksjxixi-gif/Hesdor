@@ -1,4 +1,4 @@
-import { readdir, readFile } from 'node:fs/promises'
+import { lstat, readdir, readFile, unlink } from 'node:fs/promises'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { configDir, writeFileAtomic } from './config.js'
@@ -196,4 +196,42 @@ export function titleFrom(messages: ChatMessage[]): string {
   const text = firstUser?.content.replace(/\s+/g, ' ').trim() ?? ''
   if (text === '') return '(untitled)'
   return text.length > 60 ? `${text.slice(0, 60)}…` : text
+}
+
+/**
+ * Delete transcripts of every workspace not updated for `retainDays` (config `sessions.retainDays`), with
+ * their index entries. Runs in this process's save queue; returns how many were deleted.
+ */
+export function pruneSessions(retainDays: number, now = Date.now()): Promise<number> {
+  const run = saveChain.then(() => pruneNow(now - retainDays * 86_400_000))
+  saveChain = run.catch(() => {})
+  return run
+}
+
+async function pruneNow(cutoff: number): Promise<number> {
+  const base = path.join(configDir(), 'sessions')
+  let removed = 0
+  for (const repo of await readdir(base, { withFileTypes: true }).catch(() => [])) {
+    if (!repo.isDirectory()) continue // a symlink is not followed
+    const dir = path.join(base, repo.name)
+    const index = await readIndex(dir)
+    const indexed = new Map(index.map((e) => [`${e.id}.json`, e]))
+    const gone = new Set<string>()
+    for (const file of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+      if (!file.isFile() || !file.name.endsWith('.json') || file.name === INDEX_FILE) continue
+      // Indexed transcripts age by their last update; files missing from the index by mtime.
+      const updated = indexed.get(file.name)?.updatedAt ?? (await lstat(path.join(dir, file.name)).then((s) => s.mtimeMs, () => Infinity))
+      if (updated >= cutoff) continue
+      try {
+        await unlink(path.join(dir, file.name))
+        gone.add(file.name.slice(0, -'.json'.length))
+        removed++
+      } catch {
+        // in use or already gone: try again next start
+      }
+    }
+    const keep = index.filter((e) => !gone.has(e.id) && e.updatedAt >= cutoff)
+    if (keep.length < index.length) await writeFileAtomic(path.join(dir, INDEX_FILE), JSON.stringify(keep), 0o600)
+  }
+  return removed
 }
