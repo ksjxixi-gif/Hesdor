@@ -34,7 +34,7 @@ hesdor --profile economy            # or HESDOR_PROFILE=economy, or "profile": "
 
 Each tier is a ranked list in [`packages/cli/src/profiles.ts`](../packages/cli/src/profiles.ts). Hesdor uses the first candidate whose provider has a key (environment variable, `hesdor setup`, or ChatGPT sign-in for `chatgpt/...`) and is allowed by managed settings. The profile also sets one `fallback`: the next candidate with a key from another vendor. The lists are a starting point and will be tuned by benchmark results.
 
-- `-p`/`-m` (or `HESDOR_PROVIDER`/`HESDOR_MODEL`) choose the main model yourself; the profile still fills the roles. A provider and model saved in `config.json` do not override a profile.
+- `-p`/`-m` (or `HESDOR_PROVIDER`/`HESDOR_MODEL`) choose the main model yourself; the profile still fills the roles. A provider and model saved in `config.json` do not override a profile, so a model picked with `/model` lasts for that session. `hesdor config set profile none` removes a saved profile.
 - A role you set in `roles` is kept; the profile fills only the unset ones.
 - A project's `.hesdor/config.json` cannot set a profile. Managed settings can lock it with `"profile"`, and `allowedProviders` or a locked `provider` limit the candidates.
 - When no candidate of a tier has a key, `hesdor doctor` and `/status` say which variables would enable one; without a main candidate the configured provider is used, with a warning.
@@ -50,6 +50,8 @@ With the `economy` and `balanced` profiles (or your own `roles.escalation`), a r
 - the model sent cut-off or invalid tool calls 2 turns in a row.
 
 At most 2 escalations happen per turn, the run never steps back down, and the new model gets two steps before it can count as stuck itself. Only models with a key that managed settings allow are used. Each model is priced at its own catalog price and counts toward `--max-budget-usd`. Each switch emits a `provider.escalated` event (`from`, `to`, `reason`), preceded by `run.stuck` (`reason`, `detail`); headless JSON results list them in `escalations` with the step, next to `profile`. Turn it off with `"escalate": false`.
+
+A model that takes over mid-turn (escalation or fallback) keeps the tool list the turn started with: a switch from another model to a GPT-5+/Codex model keeps the find/replace `apply_patch` rather than the V4A patch format, which those models handle fine.
 
 ## Guardian
 
