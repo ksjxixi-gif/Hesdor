@@ -150,6 +150,13 @@ describe('effort, max tokens and extraBody per wire', () => {
     expect(sentBody(fm)).toMatchObject({ output_config: { effort: 'medium' }, custom_field: 1 })
   })
 
+  it('sends prompt_cache_key to OpenAI, Azure OpenAI and xAI only', async () => {
+    const hosts = ['https://api.openai.com/v1', 'https://r.openai.azure.com/openai/v1', 'https://api.x.ai/v1', 'https://gateway.example/v1']
+    const fm = mockFetch(...hosts.map(() => done.responses))
+    for (const baseUrl of hosts) await drain(provider({ baseUrl }).stream([{ role: 'user', content: 'x' }], [], new AbortController().signal, { cacheKey: 'abc' }))
+    expect(hosts.map((_, i) => sentBody(fm, i).prompt_cache_key)).toEqual(['abc', 'abc', 'abc', undefined])
+  })
+
   it('sends no effort field unless asked', async () => {
     const fm = mockFetch(done.responses, done.anthropic)
     await drain(provider().stream([{ role: 'user', content: 'x' }], [], new AbortController().signal))
