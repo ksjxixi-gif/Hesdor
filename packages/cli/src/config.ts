@@ -68,6 +68,8 @@ export interface HesdorConfig {
    * Off by default while the feature is new. A project can only tighten it; managed settings set a floor.
    */
   sandbox?: SandboxConfig
+  /** Saved transcripts: `retainDays` deletes those not updated for that many days at startup (default: kept forever). */
+  sessions?: { retainDays?: number }
 }
 
 /**
