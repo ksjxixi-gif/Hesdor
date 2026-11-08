@@ -47,9 +47,14 @@ export interface HesdorConfig {
   /**
    * Models for internal jobs, each `provider/model` resolved with that provider's own key:
    * small (compaction, guardian), subagent (explore/task default), oracle (the `oracle` tool),
-   * fallback (tried in order when the main model is overloaded, rate limited, out of quota or unreachable).
+   * fallback (tried in order when the main model is overloaded, rate limited, out of quota or unreachable),
+   * escalation (stronger models, in order, for a run that is stuck; at most 2 switches per turn).
    */
-  roles?: { small?: string; subagent?: string; oracle?: string; fallback?: string[] }
+  roles?: { small?: string; subagent?: string; oracle?: string; fallback?: string[]; escalation?: string[] }
+  /** Picks the main model and unset roles from ranked lists by which keys you have (profiles.ts); --profile overrides it. */
+  profile?: 'economy' | 'balanced' | 'frontier'
+  /** false: never switch a stuck run to roles.escalation (filled by the economy and balanced profiles). */
+  escalate?: boolean
   /** Guardian auto-review of approvals no rule settles (interactive; headless only with --guardian). Model defaults to roles.small. */
   guardian?: { enabled?: boolean; model?: string }
   /**
