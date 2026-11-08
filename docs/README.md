@@ -16,6 +16,7 @@
 | [github-action.md](github-action.md) | Running `hesdor review` on pull requests |
 | [sessions.md](sessions.md) | Sessions, export and import, privacy and the update check |
 | [acp.md](acp.md) | Using Hesdor from Zed, JetBrains, Neovim and Emacs |
+| [benchmarks.md](benchmarks.md) | How Hesdor is measured: pass rate and cost per solved task |
 | [architecture.md](architecture.md) | Packages and the flow of one turn |
 | [development.md](development.md) | Building, testing, screenshots, releasing |
 
