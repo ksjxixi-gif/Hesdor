@@ -33,6 +33,13 @@ Requires Node.js 22 or newer.
 npm i -g @dean_overlord/hesdor
 ```
 
+Without Node.js, from the next release on: standalone binaries for Windows, Linux and macOS are attached to each GitHub release, and the install scripts verify their checksum.
+
+```bash
+irm https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging/install.ps1 | iex     # Windows PowerShell
+curl -fsSL https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging/install.sh | sh   # macOS, Linux
+```
+
 Or from source:
 
 ```bash
@@ -112,6 +119,18 @@ Using a ChatGPT plan instead of an API key: `hesdor login chatgpt`, then `hesdor
 <tr>
 <td valign="top">
 
+**Catch mistakes after every edit.** Hesdor runs the formatter, linter and type checker your repository already has and shows the model only the problems its edit added; `run_tests` returns parsed failures. [Tools](docs/tools.md)
+
+</td>
+<td valign="top">
+
+**Sandbox commands.** Optional bubblewrap (Linux) or Seatbelt (macOS) sandbox: writes stay in the workspace, the network is off, and fewer prompts. [Sandbox](docs/permissions.md#sandbox)
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
 **Review pull requests.** `hesdor review` reports P0-P3 findings; a GitHub Action keeps one PR comment current. [Review](docs/review.md)
 
 </td>
@@ -148,14 +167,14 @@ A summary from our notes on each project's documentation, as of Nov 2026. Correc
 
 | | License | Models | OS-level sandbox | MCP | Subagents |
 |---|---|---|---|---|---|
-| **Hesdor** | MIT | 44 presets on 3 wire formats, custom endpoints, local servers | No: path containment, command policy, approvals | stdio and HTTP, OAuth | Read-only explore, markdown task agents |
+| **Hesdor** | MIT | 44 presets on 3 wire formats, custom endpoints, local servers | Optional: bubblewrap or Seatbelt, off by default, none on Windows yet | stdio and HTTP, OAuth | Read-only explore, markdown task agents |
 | Claude Code | Proprietary | Anthropic, also via Bedrock, Vertex, Foundry | Seatbelt or bubblewrap, off by default, none on native Windows | stdio, HTTP, SSE, WebSocket, OAuth | Markdown agents |
 | Codex CLI | Apache-2.0 | OpenAI Responses, Vertex, Bedrock, Ollama, LM Studio, custom | Seatbelt, bubblewrap and seccomp, Windows restricted token | stdio and HTTP, OAuth | TOML agents |
 | Gemini CLI | Apache-2.0 | Gemini API and Vertex (paid only since 2026-06-18) | Seatbelt, Docker or Podman, gVisor, LXC, Windows Low-IL | Yes | Preview |
 | OpenCode | MIT | 75+ providers via AI SDK and models.dev | No: permission globs | Yes | Markdown agents |
 | Aider | Apache-2.0 | Via litellm | No | Not built in (the cecli fork adds it) | Architect and editor roles |
 
-Hesdor has no OS-level sandbox. If you need one, run it in a container or VM.
+Hesdor's sandbox is new and off by default, and it does not cover Windows yet. On Windows, or for stronger isolation, run it in a container or VM.
 
 ## How it works
 
