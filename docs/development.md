@@ -21,6 +21,15 @@ See [architecture.md](architecture.md) for the package layout and the flow of on
 
 `pnpm test` includes regression evals: replayed cassettes run the real loop and tools, and SSE fixtures are re-split at random byte boundaries (`pnpm test:replay` runs only those). `evals/` has a Harbor adapter for Terminal-Bench runs. CI runs typecheck, lint, tests, build and a smoke test of the bundled CLI on Linux, Windows and macOS with Node 22 and 24.
 
+## Benchmarks
+
+`scripts/bench/matrix.mjs` runs a Harbor matrix (Hesdor routing profiles, Hesdor with explicit models, Claude Code and Codex CLI on the same Terminal-Bench tasks) and reports pass@1, pass@k, pass^k with confidence intervals, and dollars per solved task. Without `--execute` it only prints the commands and a cost estimate. See [benchmarks.md](benchmarks.md) for the method and how to run it.
+
+```bash
+node scripts/bench/matrix.mjs evals/matrix/tb21-smoke.json   # dry run: commands + cost estimate
+node --test scripts/bench                                    # aggregation math, command generation, SVG
+```
+
 ## Screenshots
 
 The images in the README and these docs are generated, not hand-drawn. `scripts/screens/` drives the built CLI against a scripted OpenAI-compatible server in a temporary git repository, with the config directory pointed at a temp folder, and converts the terminal output to SVG.
