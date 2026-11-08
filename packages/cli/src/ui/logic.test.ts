@@ -19,9 +19,12 @@ import {
   imageNotices,
   modelForProvider,
   paletteTarget,
+  profileModelNote,
   providerRefusal,
+  rewindableCheckpoints,
   rewindChat,
   runFlags,
+  scopeAfterRewind,
   selectionProblem,
   turnNotice,
   wrapText,
@@ -93,6 +96,44 @@ describe('rewindChat', () => {
       { role: 'assistant' as const, content: 'd' },
     ]
     expect(rewindChat(history, { turnIndex: 2, prompt: 'c' })).toEqual({ history: history.slice(0, 2), prompt: 'c' })
+  })
+})
+
+describe('rewind scope', () => {
+  const cp = (sessionId: string, turnIndex: number) => ({ sessionId, turnIndex })
+  const all = [cp('B', 4), cp('A', 6), cp('A', 4), cp('A', 2), cp('A', 0), cp('X', 0)]
+
+  it('offers only the session own checkpoints without a rewind', () => {
+    expect(rewindableCheckpoints(all, 'A', [])).toEqual([cp('A', 6), cp('A', 4), cp('A', 2), cp('A', 0)])
+  })
+
+  it('carries the old session checkpoints up to the rewound turn into the new session', () => {
+    const scope = scopeAfterRewind([], 'A', 4)
+    expect(rewindableCheckpoints(all, 'B', scope)).toEqual([cp('B', 4), cp('A', 4), cp('A', 2), cp('A', 0)])
+  })
+
+  it('narrows earlier sessions on a second rewind to an older turn', () => {
+    const scope = scopeAfterRewind(scopeAfterRewind([], 'A', 4), 'B', 2)
+    expect(scope).toEqual([
+      { sessionId: 'A', maxTurn: 2 },
+      { sessionId: 'B', maxTurn: 2 },
+    ])
+    expect(rewindableCheckpoints(all, 'C', scope)).toEqual([cp('A', 2), cp('A', 0)])
+  })
+})
+
+describe('profileModelNote', () => {
+  it('notes a session-only model when the profile picked the main model', () => {
+    const eff = { profile: { name: 'balanced' }, sources: { provider: 'profile', profile: 'user' } }
+    expect(profileModelNote(eff, 'gpt-x')).toBe(
+      'profile balanced picks the model at each start: gpt-x applies to this session; to keep it, use `hesdor config set profile none` or start with -m gpt-x',
+    )
+    expect(profileModelNote({ ...eff, sources: { provider: 'profile', profile: 'env' } }, 'gpt-x')).not.toContain('config set')
+  })
+
+  it('says nothing without a profile or when -p/-m chose the model', () => {
+    expect(profileModelNote({ sources: {} }, 'm')).toBeUndefined()
+    expect(profileModelNote({ profile: { name: 'economy' }, sources: { provider: 'flag' } }, 'm')).toBeUndefined()
   })
 })
 
