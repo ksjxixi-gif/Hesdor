@@ -26,6 +26,8 @@ export interface GoalOptions {
   signal: AbortSignal
   /** Default 10. */
   maxTurns?: number
+  /** Called with each evaluator call's cost so the caller counts it against its budget and totals. */
+  onEvaluatorCost?: (usd: number) => void
 }
 
 export interface GoalResult {
@@ -86,6 +88,7 @@ export async function runGoal(opts: GoalOptions): Promise<GoalResult> {
       const judged = await evaluate(opts.evaluator, opts.condition, last.text, tools, opts.signal)
       usage = addUsage(usage, judged.usage)
       addCost(judged.costUsd)
+      if (judged.costUsd !== undefined) opts.onEvaluatorCost?.(judged.costUsd)
       verdict = judged
     } catch (err) {
       if (opts.signal.aborted) return done('cancelled', 'cancelled')
