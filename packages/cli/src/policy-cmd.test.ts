@@ -88,6 +88,19 @@ describe('hesdor policy check', () => {
     expect((await capture(['nope'], root)).code).toBe(1)
   })
 
+  it('labels managed-settings rules as managed, not project', async () => {
+    const managed = path.join(mkdtempSync(path.join(tmpdir(), 'hesdor-managed-')), 'managed-settings.json')
+    writeFileSync(managed, JSON.stringify({ permissions: { deny: ['git push'] } }))
+    vi.stubEnv('HESDOR_MANAGED_SETTINGS', managed)
+    try {
+      const { out } = await capture(['check', 'git', 'push'], project({ deny: ['git push'] }))
+      expect(out).toContain('why:    managed deny rule "git push"')
+      expect(out).toContain(`from:   ${managed}`)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it("parses everything after `policy` verbatim, so the command's flags are not Hesdor's", () => {
     expect(parseArgs(['policy', 'check', 'git', 'commit', '-m', 'a b', '-f'])).toMatchObject({
       command: 'policy',
