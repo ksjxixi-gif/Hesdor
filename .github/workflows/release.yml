@@ -61,3 +61,55 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
           fi
+
+  # Standalone binaries (Node.js single executable applications), built and smoke-tested natively per OS/arch.
+  # Independent of the npm publish above, so a failed binary build never blocks npm. Nothing is code-signed yet.
+  binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: win-x64, exe: hesdor.exe }
+          - { os: ubuntu-latest, target: linux-x64, exe: hesdor }
+          - { os: ubuntu-24.04-arm, target: linux-arm64, exe: hesdor }
+          - { os: macos-latest, target: macos-arm64, exe: hesdor }
+          - { os: macos-15-intel, target: macos-x64, exe: hesdor }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26 # `node --build-sea` needs >= 25.5; this node is what the binary embeds
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: node scripts/release/build-binaries.mjs
+      - name: Smoke test the binary (version, help, doctor, headless run against a fake model)
+        run: node scripts/release/smoke-binary.mjs "dist/release/work/${{ matrix.exe }}" "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hesdor-${{ matrix.target }}
+          path: dist/release/hesdor-${{ matrix.target }}.*
+          if-no-files-found: error
+
+  release-assets:
+    needs: [publish, binaries] # the GitHub release is created by the publish job
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hesdor-*
+          path: assets
+          merge-multiple: true
+      - name: Upload binaries and SHA256SUMS to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: assets
+        run: |
+          sha256sum hesdor-* > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$GITHUB_REF_NAME" hesdor-* SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
