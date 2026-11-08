@@ -105,3 +105,33 @@ describe('session index, resume and linked ids', () => {
     expect((await listSessions(root)).map((m) => m.title).sort()).toEqual(['child', 'parent'])
   })
 })
+
+describe('sessions retention', () => {
+  it('pruneSessions deletes transcripts and index entries older than retainDays, nothing else', async () => {
+    const { existsSync, readFileSync, utimesSync, writeFileSync } = await import('node:fs')
+    const { listSessions, pruneSessions, saveSession } = await import('./sessions.js')
+    const root = mkdtempSync(path.join(tmpdir(), 'hesdor-retain-'))
+    const msg = [{ role: 'user' as const, content: 'x' }]
+    await saveSession(root, { id: 'old-one', title: 'old', messages: msg })
+    await new Promise((r) => setTimeout(r, 30))
+    await saveSession(root, { id: 'new-one', title: 'new', messages: msg })
+    const metas = await listSessions(root)
+    const dir = path.dirname(metas[0]!.file)
+    const newest = metas.find((m) => m.id === 'new-one')!.updatedAt
+    // Transcripts missing from the index age by mtime; other files are never touched.
+    writeFileSync(path.join(dir, 'orphan-old.json'), '{}')
+    utimesSync(path.join(dir, 'orphan-old.json'), new Date(2020, 0, 1), new Date(2020, 0, 1))
+    writeFileSync(path.join(dir, 'orphan-new.json'), '{}')
+    writeFileSync(path.join(dir, 'notes.txt'), 'keep')
+    utimesSync(path.join(dir, 'notes.txt'), new Date(2020, 0, 1), new Date(2020, 0, 1))
+
+    // Cutoff (now - 1 day) falls just before the newer session.
+    expect(await pruneSessions(1, newest + 86_400_000 - 1)).toBeGreaterThanOrEqual(2)
+    expect((await listSessions(root)).map((m) => m.id)).toEqual(['new-one'])
+    expect(JSON.parse(readFileSync(path.join(dir, 'index.json'), 'utf8')).map((e: { id: string }) => e.id)).toEqual(['new-one'])
+    expect(existsSync(path.join(dir, 'old-one.json'))).toBe(false)
+    expect(existsSync(path.join(dir, 'orphan-old.json'))).toBe(false)
+    expect(existsSync(path.join(dir, 'orphan-new.json'))).toBe(true)
+    expect(existsSync(path.join(dir, 'notes.txt'))).toBe(true)
+  })
+})
