@@ -12,7 +12,7 @@ export interface AuthStore {
   [providerId: string]: string
 }
 
-function authFile(): string {
+export function authFile(): string {
   return path.join(hesdorGlobalDir(), 'auth.json')
 }
 
