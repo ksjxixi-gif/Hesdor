@@ -1,6 +1,8 @@
 import path from 'node:path'
 import {
   agentDirs,
+  autoPruneCheckpoints,
+  cleanSpillDir,
   commandHooksPlugin,
   createDefaultRegistry,
   createHookDispatcher,
@@ -26,7 +28,20 @@ import { ToolRegistry } from '@hesdor/agent-core'
 import type { AgentDef, CustomCommand, LoadedPlugin, McpElicitHook, McpServerConfig, RegisteredMcpServer, RepoContextInfo, SkillInfo } from '@hesdor/agent-core'
 import { configDir, loadConfig } from './config.js'
 import { loadManagedSettings } from './config-layers.js'
+import { pruneSessions } from './sessions.js'
 import { fingerprint, projectCodeFiles, UNTRUSTED_WARNING } from './trust.js'
+
+/** Disk hygiene at session start: old checkpoints, spill files and (when configured) transcripts. Background; never throws. */
+export function startHousekeeping(root: string): Promise<unknown> {
+  return Promise.allSettled([
+    autoPruneCheckpoints(root),
+    cleanSpillDir(root),
+    loadConfig().then((cfg) => {
+      const days = cfg.sessions?.retainDays
+      return typeof days === 'number' && days > 0 ? pruneSessions(days) : 0
+    }),
+  ])
+}
 
 export interface Session {
   info: RepoContextInfo
@@ -80,6 +95,7 @@ export interface CreateSessionOptions {
  */
 export async function createSession(opts: CreateSessionOptions): Promise<Session> {
   const warn = opts.warn ?? (() => {})
+  void startHousekeeping(opts.root)
   const globalDir = configDir()
   const projectExt = path.join(opts.root, '.hesdor')
 
