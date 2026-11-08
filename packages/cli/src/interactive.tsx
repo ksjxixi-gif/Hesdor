@@ -34,6 +34,7 @@ export async function startInteractive(flags: CliFlags, initialPrompt?: string):
   let providerId: string
   let model: string
   let keySource: string
+  let oracle = ''
   let update: string | null = null
   try {
     // shortcut: a project config approved at this start's trust prompt applies from the next start.
@@ -51,6 +52,7 @@ export async function startInteractive(flags: CliFlags, initialPrompt?: string):
     }
     providerId = sel.providerId
     model = sel.model
+    oracle = cfg.roles?.oracle ?? ''
     keySource = sel.keySource
   } catch (err) {
     console.error(`✗ ${err instanceof Error ? err.message : String(err)}`)
@@ -61,6 +63,7 @@ export async function startInteractive(flags: CliFlags, initialPrompt?: string):
   let startup = true
   const session = await createSession({
     root,
+    oracle,
     warn: (m) => console.error(`• ${m}`),
     trust: async (files, print) => {
       if (flags.trustWorkspace || (await isTrusted(root, print))) return true
