@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { RunEvent } from '@hesdor/protocol'
-import { checkpointTurn, endTurnCheckpoint, listCheckpoints, rewindFiles } from './checkpoints.js'
+import { autoPruneCheckpoints, checkpointTurn, endTurnCheckpoint, listCheckpoints, pruneAllCheckpoints, pruneCheckpoints, rewindFiles } from './checkpoints.js'
 import { diffHead, getStatus, GIT_HARDENING } from './git.js'
 
 function makeRepo(): string {
@@ -112,5 +112,83 @@ describe('git hardening', () => {
     const diff = await diffHead(repo)
     expect(diff).toContain('diff --git a/f.txt b/f.txt')
     expect(diff).not.toContain('EXTDIFF')
+  })
+})
+
+describe('checkpoint retention', () => {
+  async function turns(root: string, baseDir: string, n: number): Promise<string[]> {
+    const ids: string[] = []
+    for (let i = 0; i < n; i++) {
+      writeFileSync(path.join(root, 'f.txt'), `turn ${i}\n`)
+      const r = await checkpointTurn(root, 's', i, { baseDir, prompt: `p${i}` })
+      if (!('checkpoint' in r)) throw new Error(r.skipped)
+      ids.push(r.checkpoint.id)
+      await endTurnCheckpoint(root, 's', i, { baseDir })
+    }
+    return ids
+  }
+  const objectCount = (baseDir: string): number => {
+    const [repo] = readdirSync(path.join(baseDir, 'checkpoints'))
+    const out = execFileSync('git', [`--git-dir=${path.join(baseDir, 'checkpoints', repo!)}`, 'count-objects', '-v'], { encoding: 'utf8' })
+    return Number(/^count: (\d+)/m.exec(out)![1]) + Number(/^in-pack: (\d+)/m.exec(out)![1])
+  }
+
+  it('keeps the newest N, drops the rest with gc, and old ids still rewind', async () => {
+    const root = makeRepo()
+    const baseDir = mkdtempSync(path.join(tmpdir(), 'hesdor-cp-store-'))
+    const ids = await turns(root, baseDir, 5)
+    const objectsBefore = objectCount(baseDir)
+    expect(await pruneCheckpoints(root, { baseDir, keep: 2 })).toEqual({ removed: 3, kept: 2 })
+    const left = await listCheckpoints(root, { baseDir })
+    expect(left.map((c) => c.prompt)).toEqual(['p4', 'p3'])
+    expect(objectCount(baseDir)).toBeLessThan(objectsBefore)
+    // A session that listed checkpoints before the prune still rewinds by the old id.
+    writeFileSync(path.join(root, 'f.txt'), 'later\n')
+    await rewindFiles(root, ids[3]!.slice(0, 12), { baseDir })
+    expect(readFileSync(path.join(root, 'f.txt'), 'utf8')).toBe('turn 3\n')
+    await expect(rewindFiles(root, ids[0]!, { baseDir })).rejects.toThrow(/no checkpoint/)
+    // Nothing more to drop: a no-op.
+    expect(await pruneCheckpoints(root, { baseDir, keep: 2 })).toEqual({ removed: 0, kept: 2 })
+  })
+
+  it('drops checkpoints older than maxAgeDays', async () => {
+    const root = makeRepo()
+    const baseDir = mkdtempSync(path.join(tmpdir(), 'hesdor-cp-store-'))
+    await turns(root, baseDir, 2)
+    expect(await pruneCheckpoints(root, { baseDir, now: Date.now() + 29 * 86_400_000 })).toEqual({ removed: 0, kept: 2 })
+    expect(await pruneCheckpoints(root, { baseDir, now: Date.now() + 31 * 86_400_000 })).toEqual({ removed: 2, kept: 0 })
+    expect(await listCheckpoints(root, { baseDir })).toEqual([])
+    // The store still works afterwards.
+    await turns(root, baseDir, 1)
+    expect(await listCheckpoints(root, { baseDir })).toHaveLength(1)
+  })
+
+  it('auto-prunes at most once a day per workspace and never throws', async () => {
+    const root = makeRepo()
+    const baseDir = mkdtempSync(path.join(tmpdir(), 'hesdor-cp-store-'))
+    expect(await autoPruneCheckpoints(root, { baseDir })).toBeUndefined() // no store yet
+    await turns(root, baseDir, 3)
+    expect(await autoPruneCheckpoints(root, { baseDir, keep: 2 })).toEqual({ removed: 1, kept: 2 })
+    await turns(root, baseDir, 1)
+    expect(await autoPruneCheckpoints(root, { baseDir, keep: 2 })).toBeUndefined() // stamped today
+    const [repo] = readdirSync(path.join(baseDir, 'checkpoints'))
+    const stamp = path.join(baseDir, 'checkpoints', repo!, 'hesdor-pruned')
+    const yesterday = new Date(Date.now() - 25 * 3_600_000)
+    utimesSync(stamp, yesterday, yesterday)
+    expect(await autoPruneCheckpoints(root, { baseDir, keep: 2 })).toEqual({ removed: 1, kept: 2 })
+  })
+
+  it('prune --all covers every workspace, deleted ones too, and nothing outside the store', async () => {
+    const baseDir = mkdtempSync(path.join(tmpdir(), 'hesdor-cp-store-'))
+    const a = makeRepo()
+    const b = makeRepo()
+    await turns(a, baseDir, 3)
+    await turns(b, baseDir, 2)
+    rmSync(b, { recursive: true, force: true })
+    writeFileSync(path.join(baseDir, 'checkpoints', 'stray.txt'), 'not a repo')
+    const r = await pruneAllCheckpoints({ baseDir, keep: 1 })
+    expect(r).toMatchObject({ removed: 3, kept: 2, repos: 2, failed: [] })
+    expect(readFileSync(path.join(baseDir, 'checkpoints', 'stray.txt'), 'utf8')).toBe('not a repo')
+    expect(await listCheckpoints(a, { baseDir })).toHaveLength(1)
   })
 })
