@@ -5,3 +5,5 @@ dist/
 .hesdor/
 coverage/
 evals/jobs/
+__pycache__/
+*.pyc
