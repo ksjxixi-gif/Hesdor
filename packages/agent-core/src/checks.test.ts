@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -216,6 +216,17 @@ describe('run_tests', () => {
     expect(res.failures).toEqual([expect.stringMatching(/^n\.test\.mjs:3:\d+ adds: AssertionError/)])
     await expect(exec(runTestsTool, { name: '--evil' }, ctxFor(root, { test: ['node', '--test'] }))).rejects.toThrow('must not start')
     await expect(exec(runTestsTool, {}, ctxFor(repo()))).rejects.toThrow('no test runner found')
+  })
+
+  it('reports repo-relative locations when the runner prints TAP with the real path (macOS /private/var)', async () => {
+    const real = repo({
+      'n.test.mjs': "import test from 'node:test'\nimport assert from 'node:assert'\ntest('adds', () => assert.strictEqual(1 + 2, 4))\n",
+    })
+    // The workspace is reached through a link, as /var/folders is through /private/var on macOS.
+    const link = path.join(mkdtempSync(path.join(tmpdir(), 'hesdor-link-')), 'ws')
+    symlinkSync(real, link, 'junction')
+    const res = await exec(runTestsTool, { path: 'n.test.mjs' }, ctxFor(link, { test: ['node', '--test', '--test-reporter=tap'] }))
+    expect(res.failures).toEqual([expect.stringMatching(/^n\.test\.mjs:3:\d+ adds: AssertionError/)])
   })
 
   it('nudges once per run after an edit when a test runner exists', async () => {
