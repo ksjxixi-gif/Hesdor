@@ -39,15 +39,18 @@ import {
   managedLock,
   modelForProvider,
   paletteTarget,
+  profileModelNote,
   providerRefusal,
   READ_ONLY_COMMANDS,
+  rewindableCheckpoints,
   rewindChat,
   runFlags,
+  scopeAfterRewind,
   selectionProblem,
   turnNotice,
   wrapText,
 } from './logic.js'
-import type { SessionStats } from './logic.js'
+import type { RewindScope, SessionStats } from './logic.js'
 
 type Item =
   | { key: number; kind: 'user'; text: string }
@@ -261,8 +264,10 @@ export function App({
   const queueRef = useRef<string[]>([])
   const sessionIdRef = useRef(newSessionId())
   const sessionCreatedRef = useRef(Date.now())
-  /** Session this one continues (after /clear or /compact). */
+  /** Session this one continues (after /clear, /compact or a chat rewind). */
   const parentIdRef = useRef<string | undefined>(undefined)
+  /** Earlier sessions whose checkpoints /rewind still offers (set by chat rewinds). */
+  const rewindScopeRef = useRef<RewindScope>([])
   // A queued prompt starts later: it must see the mode and model of that moment, not of the enqueueing render.
   const modeRef = useRef(mode)
   modeRef.current = mode
@@ -484,11 +489,12 @@ export function App({
     }).catch(() => {})
   }, [info.root])
 
-  /** Start a new session id that records the current one as its parent (/clear, /compact). */
-  const forkSessionId = useCallback((): void => {
+  /** Start a new session id that records the current one as its parent (/clear, /compact, chat rewind). */
+  const forkSessionId = useCallback((scope: RewindScope = []): void => {
     parentIdRef.current = sessionIdRef.current
     sessionIdRef.current = newSessionId()
     sessionCreatedRef.current = Date.now()
+    rewindScopeRef.current = scope
   }, [])
 
   const updateStats = useCallback((next: SessionStats): void => {
@@ -502,6 +508,7 @@ export function App({
       sessionIdRef.current = stored.id
       sessionCreatedRef.current = stored.createdAt
       parentIdRef.current = stored.parentId
+      rewindScopeRef.current = []
       const restored = historyItems(stored.messages)
       setItems((prev) => [...prev, ...restored.map((r) => ({ ...r, key: ++keyCounter.current }) as Item)])
       pushItem({
@@ -719,8 +726,14 @@ export function App({
       if (id === providerIdRef.current) setModel(m)
       void saveConfig({ models: { [id]: m } }).catch(reportFailure('saving the model'))
       pushItem({ kind: 'status', text: `model → ${m} (saved for ${id})`, tone: 'info' })
+      if (id === providerIdRef.current) {
+        void effective().then((eff) => {
+          const note = profileModelNote(eff, m)
+          if (note) pushItem({ kind: 'status', text: note, tone: 'info' })
+        }, reportFailure('reading the profile'))
+      }
     },
-    [pushItem, reportFailure],
+    [effective, pushItem, reportFailure],
   )
 
   const openProviderPicker = useCallback((): void => {
@@ -822,17 +835,25 @@ export function App({
         const notes = what === 'files' || what === 'both' ? await rewindWorkspace(checkpoint.id) : []
         if (what === 'chat' || what === 'both') {
           const chat = rewindChat(historyRef.current, checkpoint)
+          const kept = sessionIdRef.current
+          // Turns are dropped: continue in a linked session so the saved transcript keeps them.
+          const forked = chat.history.length < historyRef.current.length
+          if (forked) forkSessionId(scopeAfterRewind(rewindScopeRef.current, kept, checkpoint.turnIndex))
           historyRef.current = chat.history
           persist()
           updateStats({ ...statsRef.current, contextTokens: undefined })
           setItems(historyItems(chat.history).map((r) => ({ ...r, key: ++keyCounter.current }) as Item))
           replaceInput(chat.prompt)
-          pushItem({ kind: 'status', text: 'chat rewound — the prompt is back in the input box', tone: 'success' })
+          pushItem({
+            kind: 'status',
+            text: `chat rewound — the prompt is back in the input box${forked ? ` (full transcript kept as session ${kept})` : ''}`,
+            tone: 'success',
+          })
         }
         for (const note of notes) pushItem(note)
       })().catch(reportFailure('rewind'))
     },
-    [persist, pushItem, replaceInput, reportFailure, rewindWorkspace, updateStats],
+    [forkSessionId, persist, pushItem, replaceInput, reportFailure, rewindWorkspace, updateStats],
   )
 
   /** OAuth login for a url MCP server, then reconnect (the URL to open is shown as a status line). */
@@ -983,7 +1004,8 @@ export function App({
         }
         case 'rewind': {
           setPicker({ kind: 'rewind', loading: true, checkpoints: [] })
-          void listCheckpoints(info.root, { sessionId: sessionIdRef.current }).then(
+          // Includes earlier sessions' checkpoints a chat rewind carried over (rewindableCheckpoints).
+          void listCheckpoints(info.root).then((all) => rewindableCheckpoints(all, sessionIdRef.current, rewindScopeRef.current)).then(
             (checkpoints) =>
               setPicker((current) =>
                 current?.kind === 'rewind'
@@ -1181,6 +1203,7 @@ export function App({
           sessionIdRef.current = newSessionId()
           sessionCreatedRef.current = Date.now()
           parentIdRef.current = undefined
+          rewindScopeRef.current = []
           rewindBackupRef.current = undefined
           updateStats({})
           pushItem({ kind: 'status', text: `new session ${sessionIdRef.current}`, tone: 'info' })
