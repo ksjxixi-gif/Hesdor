@@ -69,6 +69,8 @@ export interface CreateSessionOptions {
    * Omitted means untrusted.
    */
   trust?: (files: string[], fingerprint: string) => Promise<boolean>
+  /** roles.oracle after config layers and the profile ('' for none); omitted: read from the user config. */
+  oracle?: string
 }
 
 /**
@@ -171,7 +173,7 @@ export async function createSession(opts: CreateSessionOptions): Promise<Session
     for (const cmd of mcpPromptCommands(clients)) if (!state.commands.has(cmd.name)) state.commands.set(cmd.name, cmd)
 
     // roles.oracle (user config only) adds the second-opinion tool; resolveRoles warns when its key is missing.
-    const oracle = (await loadConfig().catch(() => undefined))?.roles?.oracle
+    const oracle = opts.oracle ?? (await loadConfig().catch(() => undefined))?.roles?.oracle
     if (typeof oracle === 'string' && oracle.trim() !== '') state.registry.register(createOracleTool(oracle))
 
     // Agents are prompt text (no trust gate); the task tool goes last so it sees every tool's risk.
