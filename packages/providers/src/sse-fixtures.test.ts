@@ -7,6 +7,7 @@ import { AnthropicProvider } from './anthropic.js'
 import { OpenAICompatibleProvider } from './openai-compatible.js'
 import { OpenAIResponsesProvider } from './openai-responses.js'
 import { ProviderError } from './provider.js'
+import { sseData } from './sse.js'
 
 /**
  * SSE robustness: every fixture in __fixtures__ (hand-authored or recorded with
@@ -312,11 +313,19 @@ describe('SSE fault cases', () => {
     expect(String((error as Error).message)).toContain('unparseable stream data')
   })
 
-  // shortcut: lone-CR line endings are legal SSE (spec: CRLF | LF | CR) but no provider sends them;
-  // sseData only splits on LF, so such a stream reads as one unterminated line. Low severity.
-  it.skip('BUG (spec gap): lone CR line endings are not recognized by sseData', async () => {
+  it('recognizes lone CR line endings (spec: CRLF | LF | CR), and a CRLF split across chunks', async () => {
     const { chunks, error } = await run('openai-compatible', [enc(sse(oaText('x'), oaStop).replace(/\n/g, '\r'))])
     expect(error).toBeUndefined()
     expect(chunks).toEqual([{ type: 'text', text: 'x' }, { type: 'finish', reason: 'stop' }])
+
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        for (const part of ['data: a\r', '\ndata: b\r', '\r\n', 'data: c\n']) c.enqueue(enc(part))
+        c.close()
+      },
+    })
+    const lines: string[] = []
+    for await (const d of sseData(new Response(body))) lines.push(d)
+    expect(lines).toEqual(['a', 'b', 'c'])
   })
 })
