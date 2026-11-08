@@ -243,9 +243,11 @@ export interface PermissionRules {
 export interface PermissionPolicy {
   user: PermissionRules
   project: Pick<PermissionRules, 'ask' | 'deny'>
+  /** Admin managed-settings.json ask/deny rules (tighten only). */
+  managed?: Pick<PermissionRules, 'ask' | 'deny'>
 }
 
-export type PermissionSource = 'user' | 'project' | 'built-in' | 'default'
+export type PermissionSource = 'managed' | 'user' | 'project' | 'built-in' | 'default'
 
 export interface PermissionDecision {
   action: 'allow' | 'ask' | 'deny'
@@ -377,8 +379,8 @@ function builtInSafe(argv: string[]): boolean {
  */
 export function decideCommand(argv: string[], policy?: PermissionPolicy): PermissionDecision {
   for (const action of ['deny', 'ask'] as const) {
-    for (const source of ['user', 'project'] as const) {
-      const rule = commandRules(policy?.[source][action]).find((r) => prefixMatches(ruleArgv(r), argv, true))
+    for (const source of ['managed', 'user', 'project'] as const) {
+      const rule = commandRules(policy?.[source]?.[action]).find((r) => prefixMatches(ruleArgv(r), argv, true))
       if (rule !== undefined) return { action, source, rule, reason: `${source} ${action} rule ${ruleToString(rule)}` }
     }
   }
@@ -422,11 +424,11 @@ export function decideFetch(host: string, policy?: PermissionPolicy): Permission
   return decideByRules(matches, policy, { action: 'ask', source: 'default', reason: `no rule allows fetching from ${host}` })
 }
 
-/** deny > ask (user, then project) > user allow > fallback. */
+/** deny > ask (managed, user, then project) > user allow > fallback. */
 function decideByRules(matches: (r: PermissionRule) => boolean, policy: PermissionPolicy | undefined, fallback: PermissionDecision): PermissionDecision {
   for (const action of ['deny', 'ask'] as const) {
-    for (const source of ['user', 'project'] as const) {
-      const rule = policy?.[source][action]?.find(matches)
+    for (const source of ['managed', 'user', 'project'] as const) {
+      const rule = policy?.[source]?.[action]?.find(matches)
       if (rule !== undefined) return { action, source, rule, reason: `${source} ${action} rule ${ruleToString(rule)}` }
     }
   }
