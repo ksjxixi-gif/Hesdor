@@ -6,6 +6,8 @@ import { getPreset } from '@hesdor/providers'
 import type { CliFlags } from './args.js'
 import { configFile, loadConfig, modelIdError, PROVIDER_ID_RE, readJsonObject, saveConfig } from './config.js'
 import type { HesdorConfig } from './config.js'
+import { applyProfile, PROFILE_NAMES } from './profiles.js'
+import type { ProfileResolution } from './profiles.js'
 import { fingerprint, isTrusted, projectCodeFiles } from './trust.js'
 
 /**
@@ -13,7 +15,7 @@ import { fingerprint, isTrusted, projectCodeFiles } from './trust.js'
  * project `.hesdor/config.json` (trusted workspaces only, safe keys only) > user config.json > defaults.
  * saveConfig still writes only the user file.
  */
-export type Layer = 'managed' | 'flag' | 'env' | 'project' | 'user' | 'default'
+export type Layer = 'managed' | 'flag' | 'env' | 'project' | 'user' | 'profile' | 'default'
 
 /** Admin policy file (managed-settings.json). Its values win over every other layer. */
 export interface ManagedSettings {
@@ -22,6 +24,8 @@ export interface ManagedSettings {
   effort?: 'low' | 'medium' | 'high'
   mode?: 'build' | 'plan' | 'ask'
   updateCheck?: boolean
+  /** Locks the model profile (economy | balanced | frontier). */
+  profile?: 'economy' | 'balanced' | 'frontier'
   /** Only these provider ids may be used (main model, roles and agents). */
   allowedProviders?: string[]
   disableGuardian?: boolean
@@ -35,7 +39,7 @@ export interface ManagedSettings {
   sandbox?: SandboxConfig
 }
 
-type Scalar = 'provider' | 'model' | 'maxTokens' | 'effort' | 'mode' | 'updateCheck'
+type Scalar = 'provider' | 'model' | 'maxTokens' | 'effort' | 'mode' | 'updateCheck' | 'profile'
 
 const oneOf =
   (...values: string[]) =>
@@ -48,6 +52,7 @@ const CHECK: Record<Scalar, (v: unknown) => string | undefined> = {
   effort: oneOf('low', 'medium', 'high'),
   mode: oneOf('build', 'plan', 'ask'),
   updateCheck: (v) => (typeof v === 'boolean' ? undefined : 'must be true or false'),
+  profile: oneOf(...PROFILE_NAMES),
 }
 
 /** What a repository may set. Never provider, endpoints, keys, roles, guardian, permissions or updateCheck. */
@@ -58,9 +63,10 @@ const ENV_KEYS: Record<string, Scalar> = {
   HESDOR_MAX_TOKENS: 'maxTokens',
   HESDOR_EFFORT: 'effort',
   HESDOR_MODE: 'mode',
+  HESDOR_PROFILE: 'profile',
 }
-const FLAG_NAMES: Partial<Record<Scalar, string>> = { provider: '--provider', maxTokens: '--max-tokens', effort: '--effort', mode: '--mode' }
-const MANAGED_SCALARS: Array<Exclude<Scalar, 'model'>> =['provider', 'maxTokens', 'effort', 'mode', 'updateCheck']
+const FLAG_NAMES: Partial<Record<Scalar, string>> = { provider: '--provider', maxTokens: '--max-tokens', effort: '--effort', mode: '--mode', profile: '--profile' }
+const MANAGED_SCALARS: Array<Exclude<Scalar, 'model'>> =['provider', 'maxTokens', 'effort', 'mode', 'updateCheck', 'profile']
 const MANAGED_BOOLS = ['disableGuardian', 'disableWebTools', 'disableMcp'] as const
 /** Shown by `config list/get` when nothing sets them. */
 const DEFAULTS: Record<string, unknown> = { maxTokens: 8192, mode: 'build', updateCheck: true }
@@ -117,6 +123,8 @@ export interface EffectiveConfig {
   sources: Record<string, Layer>
   managed: ManagedSettings
   warnings: string[]
+  /** Set when a profile is active (loadEffectiveConfig): what it picked and why. */
+  profile?: ProfileResolution
 }
 
 const NO_FLAGS: CliFlags = { yes: false, debug: false, force: false, version: false, help: false }
@@ -194,12 +202,13 @@ export function mergeLayers(input: LayerInput): EffectiveConfig {
     if (error) warnings.push(`.hesdor/config.json: ${key} ${error}; ignored`)
     else set(key as Scalar, value, 'project')
   }
-  for (const k of ['model', 'maxTokens', 'effort', 'mode'] as const) if (envValues[k] !== undefined) set(k, envValues[k], 'env')
+  for (const k of ['model', 'maxTokens', 'effort', 'mode', 'profile'] as const) if (envValues[k] !== undefined) set(k, envValues[k], 'env')
 
   // Flags stay flags (resolveSelection reads them); config only records that they win.
   if (flags.mode !== undefined) set('mode', flags.mode, 'flag')
   if (flags.effort !== undefined) set('effort', flags.effort, 'flag')
   if (flags.maxTokens !== undefined) set('maxTokens', flags.maxTokens, 'flag')
+  if (flags.profile !== undefined) set('profile', flags.profile, 'flag')
   if (flags.provider !== undefined) sources.provider = 'flag'
   if (flags.model !== undefined) sources.model = 'flag'
 
@@ -279,6 +288,14 @@ export async function loadEffectiveConfig(
   }
   const eff = mergeLayers({ user, project, env, flags, managed })
   eff.warnings.unshift(...projectWarnings)
+  if (eff.config.profile) {
+    eff.profile = await applyProfile(eff, {
+      explicitMain: Boolean(flags.provider || flags.model || env.HESDOR_PROVIDER || env.HESDOR_MODEL),
+      blocked: (id) => providerBlocked(managed, id),
+      ...(managed.provider ? { lockedProvider: managed.provider } : {}),
+    })
+    eff.warnings.push(...eff.profile.warnings)
+  }
   return eff
 }
 
@@ -323,12 +340,12 @@ export function listRows(eff: EffectiveConfig): Array<{ key: string; value: unkn
 const show = (v: unknown): string => (typeof v === 'string' ? v : JSON.stringify(v))
 
 /** Keys `hesdor config set` writes (user scope). Everything else is edited in config.json or via setup/policy. */
-const SETTABLE = /^(provider|model|maxTokens|effort|mode|updateCheck|models\.[a-z0-9][a-z0-9._-]*|roles\.(small|subagent|oracle)|guardian\.(enabled|model))$/
+const SETTABLE = /^(provider|model|maxTokens|effort|mode|updateCheck|profile|escalate|models\.[a-z0-9][a-z0-9._-]*|roles\.(small|subagent|oracle)|guardian\.(enabled|model))$/
 
 /** Parse and validate a `config set` value. Returns the value or throws with the reason. */
 export function parseSetting(key: string, raw: string, user: HesdorConfig, managed: ManagedSettings = {}): unknown {
   if (!SETTABLE.test(key)) {
-    throw new Error(`"${key}" cannot be set here; settable keys: provider, model, maxTokens, effort, mode, updateCheck, models.<provider>, roles.small|subagent|oracle, guardian.enabled|model`)
+    throw new Error(`"${key}" cannot be set here; settable keys: provider, model, maxTokens, effort, mode, updateCheck, profile, escalate, models.<provider>, roles.small|subagent|oracle, guardian.enabled|model`)
   }
   const fail = (why: string): never => {
     throw new Error(`invalid value for ${key}: ${why}`)
@@ -343,8 +360,8 @@ export function parseSetting(key: string, raw: string, user: HesdorConfig, manag
     const error = CHECK.maxTokens(n)
     return error ? fail(error) : n
   }
-  if (key === 'updateCheck' || key === 'guardian.enabled') return raw === 'true' ? true : raw === 'false' ? false : fail('must be true or false')
-  if (key === 'effort' || key === 'mode') return CHECK[key](raw) ? fail(CHECK[key](raw)!) : raw
+  if (key === 'updateCheck' || key === 'guardian.enabled' || key === 'escalate') return raw === 'true' ? true : raw === 'false' ? false : fail('must be true or false')
+  if (key === 'effort' || key === 'mode' || key === 'profile') return CHECK[key](raw) ? fail(CHECK[key](raw)!) : raw
   if (key === 'provider') {
     known(raw)
     return raw
