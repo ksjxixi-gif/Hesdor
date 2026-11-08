@@ -47,7 +47,7 @@ node --test scripts/screens                 # tests for the ANSI to SVG converte
 
 Releases are published by [`.github/workflows/release.yml`](../.github/workflows/release.yml): bump `version` in `packages/cli/package.json`, add its section to [CHANGELOG.md](../CHANGELOG.md), then push a matching tag (`git tag v0.2.0 && git push origin v0.2.0`). The workflow runs typecheck, lint and tests, publishes `@dean_overlord/hesdor` to npm through trusted publishing with provenance, and creates a GitHub release from the changelog. The installed command is `hesdor`.
 
-The npm tarball contains only `bin/`, `dist/bundle.js`, `LICENSE` and `README.md`, and `prepack` builds every workspace package first.
+The npm tarball contains only `bin/`, `dist/bundle.js` with its lazily loaded `dist/chunks/` (the build is code-split so `--version`, `--help`, doctor and headless runs never load Ink, the MCP SDK or the ACP SDK; the standalone binary is still one bundled file), `LICENSE` and `README.md`, and `prepack` builds every workspace package first.
 
 ## Distribution
 
