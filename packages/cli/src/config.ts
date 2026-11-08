@@ -2,7 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { ProviderKind } from '@hesdor/providers'
-import type { PermissionRules } from '@hesdor/agent-core'
+import type { ChecksConfig, PermissionRules, SandboxConfig } from '@hesdor/agent-core'
 
 export interface CustomProviderConfig {
   /** Wire format: openai (chat completions), openai-responses, or anthropic. */
@@ -52,6 +52,17 @@ export interface HesdorConfig {
   roles?: { small?: string; subagent?: string; oracle?: string; fallback?: string[] }
   /** Guardian auto-review of approvals no rule settles (interactive; headless only with --guardian). Model defaults to roles.small. */
   guardian?: { enabled?: boolean; model?: string }
+  /**
+   * Post-edit checks and the run_tests command, each an argv (no shell; `{file}` = the edited file).
+   * Absent kinds are detected from installed tools; `[]` turns one off. A trusted project's
+   * .hesdor/config.json overrides these per kind.
+   */
+  checks?: ChecksConfig
+  /**
+   * OS sandbox for run_command and background jobs (Linux bwrap, macOS Seatbelt; not Windows yet).
+   * Off by default while the feature is new. A project can only tighten it; managed settings set a floor.
+   */
+  sandbox?: SandboxConfig
 }
 
 /**
