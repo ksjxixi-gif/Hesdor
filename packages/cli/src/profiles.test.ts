@@ -1,10 +1,10 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { getModelInfo, getPreset, PROVIDER_PRESETS } from '@hesdor/providers'
 import type { CliFlags } from './args.js'
-import { saveCredential } from './auth.js'
+import { authFile, saveCredential } from './auth.js'
 import type { HesdorConfig } from './config.js'
 import { mergeLayers, providerBlocked } from './config-layers.js'
 import type { Layer } from './config-layers.js'
@@ -71,6 +71,28 @@ describe('applyProfile', () => {
       expect(r.lines).toContain('main: minimax/MiniMax-M3.1-Flash (key saved by hesdor setup)')
     } finally {
       await saveCredential('minimax', '')
+    }
+  })
+
+  it('caches key lookups per process until auth.json changes mtime or size', async () => {
+    const file = authFile()
+    mkdirSync(path.dirname(file), { recursive: true })
+    const write = (body: string, mtime: Date): void => {
+      writeFileSync(file, body)
+      utimesSync(file, mtime, mtime)
+    }
+    const t0 = new Date(Date.now() - 60_000)
+    try {
+      write('{"minimax":"k"}', t0)
+      expect((await resolve({ profile: 'economy' })).config.provider).toBe('minimax')
+      // Same size and mtime: the cached lookup stands (the file is not re-read).
+      write('{"zai":"kkkkk"}', t0)
+      expect((await resolve({ profile: 'economy' })).config.provider).toBe('minimax')
+      // A new mtime invalidates it.
+      write('{"zai":"kkkkk"}', new Date())
+      expect((await resolve({ profile: 'economy' })).config.provider).toBe('zai')
+    } finally {
+      rmSync(file, { force: true })
     }
   })
 
