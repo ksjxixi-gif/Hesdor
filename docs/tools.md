@@ -29,7 +29,7 @@ In the TUI every write opens a diff review first: full height and scrollable (ar
 
 ## Reading and output
 
-`read_file` shows line numbers, refuses huge files, recognizes binary files and slices by bytes, returning an offset to continue from. Tool results are plain text; long outputs keep the first 40% and last 60%, with the full text saved to `.hesdor/out/`. Search honors `.hesdorignore`, and an invalid regex is searched as plain text.
+`read_file` shows line numbers, refuses huge files, recognizes binary files and slices by bytes, returning an offset to continue from. Tool results are plain text; long outputs keep the first 40% and last 60%, with the full text saved to `.hesdor/out/` (deleted after 7 days). Search honors `.hesdorignore`, and an invalid regex is searched as plain text.
 
 ## Commands
 
