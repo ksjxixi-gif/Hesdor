@@ -28,6 +28,20 @@ export interface OpenAIResponsesConfig extends KeySource {
 /** Namespace the ChatGPT plan route requires for function tools. */
 const PLAN_NAMESPACE = 'hesdor'
 
+/**
+ * Hosts documented to take prompt_cache_key: OpenAI (also the ChatGPT plan route), Azure OpenAI and xAI.
+ * Unknown gateways may reject unknown fields, so they never get it.
+ */
+function cacheKeyHost(baseUrl: string): boolean {
+  let host: string
+  try {
+    host = new URL(baseUrl).hostname
+  } catch {
+    return false
+  }
+  return host === 'api.openai.com' || host === 'api.x.ai' || host.endsWith('.openai.azure.com') || host.endsWith('.cognitiveservices.azure.com')
+}
+
 /** Stored as ChatMessage.providerState: reasoning items (with encrypted_content) to replay to the same endpoint. */
 interface ResponsesState {
   tag: string
@@ -75,7 +89,7 @@ export class OpenAIResponsesProvider implements ModelProvider {
     this.model = config.model
   }
 
-  async *stream(messages: ChatMessage[], tools: ToolSpec[], signal: AbortSignal): AsyncGenerator<StreamChunk> {
+  async *stream(messages: ChatMessage[], tools: ToolSpec[], signal: AbortSignal, opts?: { cacheKey?: string }): AsyncGenerator<StreamChunk> {
     const tag = `openai-responses ${this.config.baseUrl}`
     const body: Record<string, unknown> = {
       model: this.config.model,
@@ -88,6 +102,7 @@ export class OpenAIResponsesProvider implements ModelProvider {
     const instructions = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n')
     if (instructions) body.instructions = instructions
     if (this.config.effort) body.reasoning = { effort: this.config.effort }
+    if (opts?.cacheKey && cacheKeyHost(this.config.baseUrl)) body.prompt_cache_key = opts.cacheKey
     if (tools.length > 0) {
       // strict:false keeps optional parameters optional (strict mode would force every property required).
       const fns = tools.map((t) => ({ type: 'function', name: t.name, description: t.description, parameters: t.parametersJsonSchema, strict: false }))
