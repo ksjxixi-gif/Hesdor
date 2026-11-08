@@ -1,0 +1,17 @@
+{
+  "name": "tb21-smoke",
+  "dataset": "terminal-bench/terminal-bench-2-1",
+  "sample": { "n": 20, "seed": 2026, "pool": "terminal-bench-2-1.tasks.txt" },
+  "k": 3,
+  "concurrency": 4,
+  "jobsDir": "../jobs",
+  "extraArgs": ["-r", "2"],
+  "estimate": { "inputTokensPerTrial": 1500000, "outputTokensPerTrial": 50000, "cacheHit": 0.9 },
+  "contenders": [
+    { "id": "hesdor-economy", "agent": "hesdor", "profile": "economy", "priceAs": "deepseek/deepseek-flash" },
+    { "id": "hesdor-balanced", "agent": "hesdor", "profile": "balanced", "priceAs": "anthropic/claude-sonnet-5-5" },
+    { "id": "hesdor-frontier", "agent": "hesdor", "profile": "frontier", "priceAs": "anthropic/claude-opus-5-5" },
+    { "id": "claude-code-sonnet-5.5", "agent": "claude-code", "model": "anthropic/claude-sonnet-5-5" },
+    { "id": "codex-gpt-6.1-terra", "agent": "codex", "model": "openai/gpt-6.1-terra" }
+  ]
+}
