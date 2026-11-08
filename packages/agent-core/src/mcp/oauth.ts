@@ -4,7 +4,6 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
-import { auth, extractWWWAuthenticateParams } from '@modelcontextprotocol/client'
 import type {
   OAuthClientMetadata,
   OAuthClientProvider,
@@ -271,6 +270,7 @@ export interface McpLoginOptions {
  */
 export async function loginMcpServer(server: string, serverUrl: string, opts: McpLoginOptions = {}): Promise<void> {
   const print = opts.print ?? ((line: string) => console.log(line))
+  const { auth, extractWWWAuthenticateParams } = await import('@modelcontextprotocol/client') // lazy: see client.ts
   const state = randomBytes(16).toString('base64url')
   // A dynamically registered client keeps its redirect URI: reuse its port when free.
   const stored = opts.oauth?.clientId ? undefined : (await readRecord(server, serverUrl))?.client
