@@ -70,6 +70,29 @@ export function rewindChat(history: ChatMessage[], checkpoint: { turnIndex: numb
   return { history: history.slice(0, checkpoint.turnIndex), prompt: checkpoint.prompt }
 }
 
+/**
+ * Earlier sessions whose checkpoints still apply after chat rewinds: a rewound session's history is the
+ * old one's first `maxTurn` messages, so checkpoints up to that turn index stay valid for it.
+ */
+export type RewindScope = Array<{ sessionId: string; maxTurn: number }>
+
+/** Scope of the session a chat rewind of `sessionId` to `turnIndex` starts. */
+export function scopeAfterRewind(scope: RewindScope, sessionId: string, turnIndex: number): RewindScope {
+  return [...scope.map((s) => ({ ...s, maxTurn: Math.min(s.maxTurn, turnIndex) })), { sessionId, maxTurn: turnIndex }]
+}
+
+/** Checkpoints /rewind offers: the session's own, plus the earlier sessions' still within its history. */
+export function rewindableCheckpoints<C extends { sessionId: string; turnIndex: number }>(all: C[], sessionId: string, scope: RewindScope): C[] {
+  return all.filter((c) => c.sessionId === sessionId || scope.some((s) => s.sessionId === c.sessionId && c.turnIndex <= s.maxTurn))
+}
+
+/** After /model while a profile picked the main model: the choice lasts this session only (undefined: no note). */
+export function profileModelNote(eff: { profile?: { name: string }; sources: Record<string, string> }, model: string): string | undefined {
+  if (!eff.profile || eff.sources.provider !== 'profile') return undefined
+  const unset = eff.sources.profile === 'user' ? '`hesdor config set profile none` or ' : ''
+  return `profile ${eff.profile.name} picks the model at each start: ${model} applies to this session; to keep it, use ${unset}start with -m ${model}`
+}
+
 // shortcut: approximate East Asian width table (no string-width dependency); upgrade if emoji/CJK wrapping is off.
 const WIDE = /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦\u{1f300}-\u{1f64f}\u{1f900}-\u{1f9ff}\u{20000}-\u{3fffd}]/u
 const ZERO = /[\p{Mn}\p{Me}\p{Cf}]/u
