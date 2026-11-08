@@ -78,6 +78,31 @@ function findLocation(lines: string[], from: number, to: number, re: RegExp): st
 }
 
 /** Failed tests parsed from runner output (ANSI already stripped). Empty when the format is unknown. */
+/**
+ * `node --test` TAP output: a `not ok N - name` line followed by a YAML block (`---` … `...`).
+ * Only real test failures count; suites and files fail with `subtestsFailed` and are skipped.
+ */
+function parseNodeTap(lines: string[]): TestFailure[] {
+  const out: TestFailure[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const head = /^\s*not ok \d+ - (.+?)(?:\s+#.*)?$/.exec(lines[i]!)
+    if (!head) continue
+    const field: Record<string, string> = {}
+    for (let j = i + 1; j < lines.length && !/^\s*\.\.\.\s*$/.test(lines[j]!) && !/^\s*(?:not )?ok \d+ /.test(lines[j]!); j++) {
+      const kv = /^\s*(location|failureType|name|error):\s*(.*)$/.exec(lines[j]!)
+      if (!kv || field[kv[1]!] !== undefined) continue
+      // A block scalar (`error: |-`) carries its first line on the next line.
+      field[kv[1]!] = /^\|[-+]?$/.test(kv[2]!.trim()) ? (lines[j + 1] ?? '').trim() : kv[2]!.trim().replace(/^'(.*)'$/, '$1')
+    }
+    if (field.failureType !== 'testCodeFailure') continue
+    const message = [field.name, field.error].filter(Boolean).join(': ')
+    // TAP escapes backslashes in Windows paths ('C:\\repo\\n.test.mjs:3:1').
+    const location = field.location?.replace(/\\\\/g, '\\').replace(/^file:\/\/\/?/, '')
+    out.push({ name: head[1]!, ...(location ? { location } : {}), ...(message ? { message } : {}) })
+  }
+  return out
+}
+
 export function parseFailures(kind: TestKind, lines: string[]): TestFailure[] {
   const out: TestFailure[] = []
   const starts = (re: RegExp): number[] => lines.flatMap((l, i) => (re.test(l) ? [i] : []))
@@ -133,6 +158,7 @@ export function parseFailures(kind: TestKind, lines: string[]): TestFailure[] {
     })
   } else if (kind === 'node') {
     const section = lines.findIndex((l) => /^\s*✖ failing tests:/.test(l))
+    if (section < 0) out.push(...parseNodeTap(lines)) // Node < 23 prints TAP when stdout is not a terminal
     if (section >= 0) {
       let location: string | undefined
       for (let i = section + 1; i < lines.length; i++) {
