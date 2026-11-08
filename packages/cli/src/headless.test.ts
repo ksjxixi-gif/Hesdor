@@ -62,6 +62,8 @@ describe('headless machine output', () => {
     expect(lines.map((l) => l.type)).toEqual(expect.arrayContaining(['run.started', 'tool.started', 'subagent', 'run.completed']))
     const result = lines.at(-1)!
     expect(result).toMatchObject({ type: 'result', status: 'completed', result: 'final', steps: 2, error: null, error_category: null })
+    // Which main model ran (benchmarks group by it), the profile and any escalations.
+    expect(result).toMatchObject({ provider: 'scripted', model: 'scripted/fake-model', profile: null, escalations: [] })
     expect(result.session_id).toBe(lines[0]!.session_id)
     expect((result.usage as { totalTokens: number }).totalTokens).toBe(33)
   })
