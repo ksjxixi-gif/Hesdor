@@ -9,6 +9,7 @@ export async function* sseData(res: Response): AsyncGenerator<string> {
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  let skipLF = false
   try {
     for (;;) {
       const { done, value } = await reader.read().catch((err: unknown) => {
@@ -17,15 +18,18 @@ export async function* sseData(res: Response): AsyncGenerator<string> {
         throw new ProviderError(`stream interrupted: ${err instanceof Error ? err.message : String(err)}`, { kind: 'network' })
       })
       if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      let nl = buffer.indexOf('\n')
-      while (nl >= 0) {
-        const line = buffer.slice(0, nl).replace(/\r$/, '')
-        buffer = buffer.slice(nl + 1)
+      let text = decoder.decode(value, { stream: true })
+      // Lines end in CRLF, LF or CR (SSE spec). A CR that ends a chunk already ended its line,
+      // so an LF starting the next chunk is the rest of that CRLF, not an empty line.
+      const skip = skipLF && text.startsWith('\n')
+      if (text) skipLF = text.endsWith('\r')
+      if (skip) text = text.slice(1)
+      const lines = (buffer + text).split(/\r\n|\r|\n/)
+      buffer = lines.pop()!
+      for (const line of lines) {
         if (line.startsWith('data:')) {
           yield line.slice(5).trim()
         }
-        nl = buffer.indexOf('\n')
       }
     }
   } finally {
