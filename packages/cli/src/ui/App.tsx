@@ -394,6 +394,9 @@ export function App({
         case 'provider.fallback':
           pushItem({ kind: 'status', text: `${event.from} unavailable (${event.reason}): ${event.to} takes over for the rest of this turn`, tone: 'warn' })
           break
+        case 'provider.escalated':
+          pushItem({ kind: 'status', text: `stuck (${event.reason.replace('_', ' ')}): escalating from ${event.from} to ${event.to} for the rest of this turn`, tone: 'warn' })
+          break
         case 'approval.guardian':
           pushItem(
             event.decision === 'disabled'
@@ -973,6 +976,9 @@ export function App({
             ].join('\n'),
             tone: 'info',
           })
+          void effective().then((eff) => {
+            if (eff.profile) pushItem({ kind: 'status', text: eff.profile.lines.join('\n'), tone: 'info' })
+          }, reportFailure('reading the profile'))
           return
         }
         case 'rewind': {
