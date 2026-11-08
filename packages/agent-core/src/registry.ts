@@ -14,6 +14,9 @@ import { jobListTool, jobOutputTool, jobStopTool, runCommandTool } from './tools
 import { gitDiffTool, gitLogTool, gitStatusTool } from './tools/git-tools.js'
 import { exploreTool } from './tools/explore.js'
 import { webFetchTool } from './tools/web.js'
+import { runTestsTool } from './tools/tests.js'
+import { applyPatchV4ATool, usesV4APatch } from './tools/patch-v4a.js'
+import { todoWriteTool } from './tools/todo.js'
 
 /** Typed tool registry. Duplicate names are a programming error. */
 export class ToolRegistry {
@@ -37,8 +40,21 @@ export class ToolRegistry {
   readOnly(): ToolRegistry {
     const registry = new ToolRegistry()
     for (const tool of this.list()) {
-      if (tool.risk === 'READ') registry.register(tool)
+      // todo_write is the main agent's plan; a subagent must not overwrite it.
+      if (tool.risk === 'READ' && tool.name !== 'todo_write') registry.register(tool)
     }
+    return registry
+  }
+
+  /**
+   * The registry this model should see: OpenAI GPT-5+/Codex models get apply_patch in the V4A format
+   * they are trained on, every other model keeps find/replace. A function of the model only, so the
+   * tool list stays byte-stable for as long as the model does.
+   */
+  forModel(model: string): ToolRegistry {
+    if (!usesV4APatch(model) || this.get('apply_patch') !== applyPatchTool) return this
+    const registry = new ToolRegistry()
+    for (const tool of this.list()) registry.register(tool === applyPatchTool ? applyPatchV4ATool : tool)
     return registry
   }
 
@@ -69,6 +85,7 @@ export function createDefaultRegistry(): ToolRegistry {
     .register(applyPatchTool)
     .register(deleteFileTool)
     .register(runCommandTool)
+    .register(runTestsTool)
     .register(jobOutputTool)
     .register(jobStopTool)
     .register(jobListTool)
@@ -77,4 +94,5 @@ export function createDefaultRegistry(): ToolRegistry {
     .register(gitDiffTool)
     .register(gitLogTool)
     .register(webFetchTool)
+    .register(todoWriteTool)
 }
