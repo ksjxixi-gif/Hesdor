@@ -4,7 +4,15 @@
 
 Every interactive and headless run is saved as a session for its workspace, with a per-repository index so the list stays fast. `-c`/`--continue` resumes the latest session and `-r`/`--resume <id>` a specific one (unique prefixes work), in both headless and interactive mode. In the TUI, `/sessions` lists recent conversations, `/resume <n>` continues one and `/new` starts fresh.
 
-`/clear` and `/compact` start a new session linked to the previous one, so the full transcript is never overwritten. Transcripts are stored owner-only (mode `0600`) in your config directory.
+`/clear` and `/compact` start a new session linked to the previous one, so the full transcript is never overwritten. Transcripts are stored owner-only (mode `0600`) in your config directory and kept forever by default. To delete old ones, set a retention in your user `config.json`:
+
+```json
+{ "sessions": { "retainDays": 90 } }
+```
+
+At startup Hesdor then deletes, in the background, the transcripts of every workspace not updated for that many days, with their index entries.
+
+Long tool outputs spilled to `.hesdor/out/` are deleted after 7 days, when a session starts in that workspace.
 
 Checkpoints let you go back within a session: see [permissions.md](permissions.md#checkpoints-and-rewind).
 
