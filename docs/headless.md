@@ -16,8 +16,8 @@ hesdor run -r <session-id> "And update the docs"                # resume a speci
 ## Output formats
 
 - `--output-format text` (default) streams the answer to stdout and activity to stderr.
-- `json` prints only the final object: `{ type: "result", status, result, session_id, usage, cost_usd, steps, error, error_category }`. `usage` includes tokens spent by subagents, and `cost_usd` is the run's cost in USD (`null` when the model has no known price).
-- `stream-json` prints an `init` event (session id, provider, model, mode, tools, plugins, MCP servers, warnings), then every run event, explore-subagent events wrapped as `{ "type": "subagent", "event": ... }`, and the same `result` object last.
+- `json` prints only the final object: `{ type: "result", status, result, session_id, usage, cost_usd, steps, error, error_category, provider, model, profile, escalations }`. `usage` includes tokens spent by subagents, and `cost_usd` is the run's cost in USD (`null` when the model has no known price). `provider` and `model` (`provider/model`) name the main model the run started with, `profile` is the active [profile](roles.md#profiles) or `null`, and `escalations` lists `{ from, to, reason, step }` for each switch to a stronger model (see [Escalation](roles.md#escalation)). Results of runs that fail before the agent starts leave out the last four.
+- `stream-json` prints an `init` event (session id, provider, model, profile, mode, tools, plugins, MCP servers, warnings), then every run event (including `run.stuck` and `provider.escalated`), explore-subagent events wrapped as `{ "type": "subagent", "event": ... }`, and the same `result` object last.
 
 ## Exit codes
 
