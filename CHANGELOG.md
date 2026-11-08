@@ -9,6 +9,9 @@ the published CLI package (`packages/cli`).
 
 ### Security
 
+- **Optional OS sandbox:** `sandbox: { mode: "workspace-write" | "read-only", network: "off" | "on", failIfUnavailable }` runs `run_command`, background jobs, checks and `run_tests` under bubblewrap (Linux) or Seatbelt (macOS). Writes are limited to the workspace and a temp dir with `.git/hooks` and `.git/config` read-only, the network is off unless allowed, and failures name the sandbox rule that blocked them. Inside the sandbox, commands no rule covers run without a prompt; deny rules and risky-command asks still apply. A project can only make it stricter and managed settings can set a minimum. Off by default; Windows is not supported yet, and `network: "allowlist"` is accepted but keeps the network fully off until domain filtering lands.
+- Post-edit checks never run tools a repository commits under `node_modules/.bin`.
+- `hesdor policy check` labels managed-settings rules as `managed` and shows the file they come from.
 - `.hesdor/config.json` is part of the workspace trust fingerprint and can only set mode, maxTokens, effort and model. Managed settings can lock providers, force deny rules and disable the guardian, web tools, MCP and the update check.
 - ChatGPT sign-in tokens never leave api.openai.com: other base URLs are refused, redirects are not followed with a token, and the ID token is validated (signature, issuer, audience, nonce).
 - `web_fetch` refuses loopback, private, CGNAT, link-local, cloud-metadata, multicast and reserved addresses (IPv4, IPv6 and IPv4-mapped), re-checks DNS on every redirect and connects only to the checked address, and strips zero-width, bidi and Unicode tag characters. After web or MCP output, approval prompts say "after reading web/MCP content".
@@ -46,6 +49,10 @@ the published CLI package (`packages/cli`).
 
 ### Fixed
 
+- The `--goal` and `/goal` evaluator's cost counts against `--max-budget-usd` and the TUI cost total.
+- SSE streams with lone CR line endings are parsed, as the spec allows.
+- `--trust-workspace` applies a project's sandbox and checks settings without a saved approval.
+- `hesdor --help` fits in 80 columns.
 - The TUI transcript no longer overlaps open pickers, approval prompts or forms.
 - In the TUI, `/provider`, `/mode`, `/effort` and Tab respect values locked by managed settings.
 - The TUI diff no longer freezes on large files: common lines are trimmed and the rest is diffed with a bounded Myers algorithm (a 20,000-line file now takes milliseconds instead of 30 seconds and 3.9 GB).
@@ -74,6 +81,12 @@ the published CLI package (`packages/cli`).
 
 ### Added
 
+- **Checks after edits:** `write_file` and `apply_patch` format the file and run lint and typecheck, appending only problems the edit added. Configure `checks` in config.json or a trusted `.hesdor/config.json`, or let Hesdor detect prettier, biome, eslint, oxlint, tsc, ruff or black already installed in the repository.
+- **`run_tests`** runs the project's tests (vitest, jest, mocha, `node --test`, pytest, go test, cargo test, or `checks.test`) and returns failures as `file:line name: message`; after an edit the agent is reminded once to run it.
+- **V4A patches for OpenAI models:** GPT-5 and later and Codex models get `apply_patch` in the V4A format they are trained on, with the same safety rules, all-or-nothing writes and a review per file. Other models keep find/replace `apply_patch`.
+- **`todo_write`:** the model keeps a short plan for multi-step tasks; it survives compaction and is shown in the TUI and headless output.
+- **Standalone binaries** for Windows x64, Linux x64/arm64 and macOS arm64/x64 on every GitHub release, with `SHA256SUMS`; `install.ps1` and `install.sh` verify the checksum before installing, and manifests for winget, Scoop and a Homebrew tap are in `packaging/`. `hesdor upgrade` recognizes binary installs.
+- A stable per-session `prompt_cache_key` (a hash of the session id) for OpenAI, ChatGPT plan, Azure OpenAI and xAI, for better prompt-cache hits.
 - **TUI:** `/goal <condition>`, `/config` (effective settings and where each comes from), `/mcp` (servers, connection and login state, with login from the list), an MCP elicitation form with a review step, `@image.png` attachments, a "Using ChatGPT plan · Manage usage" header line, and status lines for model fallback and guardian decisions. `/compact` uses the `small` role when one is set.
 - **Use your ChatGPT plan:** `hesdor login chatgpt` (or `hesdor setup` → Continue with ChatGPT) signs in through OpenAI's official ChatGPT plan usage for open-source apps; `--provider chatgpt` then bills your ChatGPT plan, never paid API usage. `hesdor logout chatgpt` revokes the tokens.
 - **`qwen-coding-plan` preset**, interactive only as the plan's terms require (headless runs refuse it). The README lists which subscriptions are supported and why Claude Pro/Max and Google sign-in are not.
