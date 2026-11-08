@@ -44,13 +44,16 @@
       "additionalProperties": false
     },
     "updateCheck": { "type": "boolean" },
+    "profile": { "enum": ["economy", "balanced", "frontier"], "description": "Picks the main model and unset roles from ranked candidates by which keys you have (docs/roles.md). Not allowed in a project file." },
+    "escalate": { "type": "boolean", "description": "false: never switch a stuck run to roles.escalation. Default true." },
     "roles": {
       "type": "object",
       "properties": {
         "small": { "type": "string" },
         "subagent": { "type": "string" },
         "oracle": { "type": "string" },
-        "fallback": { "type": "array", "items": { "type": "string" } }
+        "fallback": { "type": "array", "items": { "type": "string" } },
+        "escalation": { "type": "array", "items": { "type": "string" }, "description": "Stronger models, in order, for a stuck run; at most 2 switches per turn." }
       },
       "additionalProperties": false
     },
