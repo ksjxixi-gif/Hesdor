@@ -204,6 +204,13 @@ describe('hesdor config', () => {
     expect((await cmd('set', 'maxTokens', '100')).out).toMatch(/managed value applies/)
   })
 
+  it('set profile none removes the profile', async () => {
+    expect((await cmd('set', 'profile', 'balanced')).code).toBe(0)
+    expect((await loadConfig()).profile).toBe('balanced')
+    expect((await cmd('set', 'profile', 'none')).out).toMatch(/^removed profile from /)
+    expect(await loadConfig()).not.toHaveProperty('profile')
+  })
+
   it('get and list show effective values with their layer', async () => {
     await saveConfig({ provider: 'openai', maxTokens: 4096, roles: { small: 'groq/x' } })
     writeManaged({ updateCheck: false, disableMcp: true })
