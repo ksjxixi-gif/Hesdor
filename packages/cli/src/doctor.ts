@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import path from 'node:path'
 import { findGitRoot } from '@hesdor/agent-core'
-import { hasRipgrep } from '@hesdor/agent-core'
+import { hasRipgrep, resolveChecks, sandboxOn, sandboxStatus } from '@hesdor/agent-core'
 import { applyEnvProxy } from '@hesdor/providers'
 import type { CliFlags } from './args.js'
 import { chatgptStatus } from './chatgpt-login.js'
@@ -146,8 +146,28 @@ export async function collectDoctorRows(flags: CliFlags): Promise<DoctorRow[]> {
   if (process.env.NODE_EXTRA_CA_CERTS) rows.push({ name: 'Extra CA', ok: true, detail: 'NODE_EXTRA_CA_CERTS set' })
   rows.push({ name: 'Telemetry', ok: true, detail: 'none — Hesdor collects and sends no usage data' })
   rows.push({ name: 'Update check', ok: true, detail: await updateCheckStatus(cfg) })
+  const sb = cfg.sandbox
+  const sbStatus = sandboxStatus()
+  rows.push({
+    name: 'Sandbox',
+    // Configured but unavailable: a warning, or a failure when failIfUnavailable makes run_command refuse.
+    ok: !sandboxOn(sb) || sbStatus.available ? true : sb.failIfUnavailable ? false : null,
+    detail: `${sandboxOn(sb) ? `${sb.mode}, network ${sb.network ?? 'off'}` : 'off'} · ${sbStatus.available ? `${sbStatus.backend} available` : sbStatus.reason}${sandboxOn(sb) && !sbStatus.available && !sb.failIfUnavailable ? ' — commands run unsandboxed' : ''}`,
+  })
 
   if (root) {
+    try {
+      const found = await resolveChecks(root, cfg.checks)
+      const list = found.checks.map((c) => `${c.kind}: ${c.name}`).join(' · ')
+      rows.push({ name: 'Edit checks', ok: true, detail: list || 'none (set checks in config.json, or install prettier, eslint, oxlint, biome or typescript in the repo)' })
+      rows.push({
+        name: 'Test runner',
+        ok: found.test ? true : null,
+        detail: found.test ? `${found.test.argv.join(' ')} (${found.test.source})` : 'none detected; set checks.test in config.json',
+      })
+    } catch {
+      // detection is best-effort
+    }
     try {
       const ext = await countExtensions(root)
       const parts = [
