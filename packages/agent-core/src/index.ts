@@ -38,8 +38,9 @@ export type {
   PermissionDecision,
   PermissionSource,
 } from './policy.js'
-export { checkpointTurn, endTurnCheckpoint, listCheckpoints, rewindFiles } from './checkpoints.js'
-export type { Checkpoint, CheckpointOptions, CheckpointResult, RewindResult } from './checkpoints.js'
+export { autoPruneCheckpoints, checkpointTurn, endTurnCheckpoint, listCheckpoints, pruneAllCheckpoints, pruneCheckpoints, rewindFiles } from './checkpoints.js'
+export type { Checkpoint, CheckpointOptions, CheckpointResult, PruneOptions, PruneResult, RewindResult } from './checkpoints.js'
+export { cleanSpillDir } from './tool-output.js'
 export { execStreaming, killChild } from './exec.js'
 export { validateSandbox, stricterSandbox, sandboxStatus, sandboxOn, sandboxArgv, seatbeltProfile, bwrapArgv, wrapCommand, sandboxHint } from './sandbox.js'
 export type { SandboxConfig, SandboxStatus } from './sandbox.js'
