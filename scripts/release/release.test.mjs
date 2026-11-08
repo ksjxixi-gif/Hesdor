@@ -69,7 +69,8 @@ describe('update-manifests', () => {
     // Only the Windows hash is recoverable from scoop; compare the files that use nothing else.
     const rendered = renderManifests(scoop.version, parseSums(sums))
     for (const file of [`winget/${WINGET_ID}.yaml`, `winget/${WINGET_ID}.installer.yaml`, `winget/${WINGET_ID}.locale.en-US.yaml`, 'scoop/hesdor.json']) {
-      assert.equal(readFileSync(path.join(PACKAGING, file), 'utf8'), rendered[file], file)
+      // Windows checkouts (core.autocrlf) turn LF into CRLF; the content is what matters.
+      assert.equal(readFileSync(path.join(PACKAGING, file), 'utf8').replace(/\r\n/g, '\n'), rendered[file], file)
     }
   })
 })
