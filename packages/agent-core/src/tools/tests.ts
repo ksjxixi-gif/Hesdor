@@ -2,7 +2,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { checksFor, stripAnsi, type TestKind, type TestRunner } from '../checks.js'
 import { execStreaming } from '../exec.js'
-import { safeResolve, toRel } from '../paths.js'
+import { realPathOf, safeResolve, toRel } from '../paths.js'
 import { wrapCommand } from '../sandbox.js'
 import { authorize } from './shell.js'
 import { defineTool } from './types.js'
@@ -237,7 +237,13 @@ export const runTestsTool = defineTool({
     const passed = result.exitCode === 0 && !result.timedOut
     const failures = passed ? [] : parseFailures(runner.kind, lines)
     const text = lines.filter((l) => l.trim() !== '')
-    const relLoc = (loc: string): string => loc.replace(/\\/g, '/').replace(`${ctx.root.replace(/\\/g, '/')}/`, '')
+    // Strip the root only as a prefix; runners may report its real path (macOS: /var -> /private/var).
+    const roots = [...new Set([ctx.root, realPathOf(ctx.root)])].map((r) => `${r.replace(/\\/g, '/')}/`)
+    const relLoc = (loc: string): string => {
+      const l = loc.replace(/\\/g, '/')
+      const r = roots.find((p) => l.startsWith(p))
+      return r ? l.slice(r.length) : l
+    }
     return {
       command,
       result: result.timedOut ? 'timed out' : passed ? 'passed' : 'failed',
