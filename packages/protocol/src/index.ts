@@ -138,6 +138,14 @@ export type RunEvent =
   | { type: 'approval.guardian'; decision: 'allow' | 'deny' | 'disabled'; action: string; reason: string }
   /** Goal mode: the evaluator judged turn `turn` (1-based) against the goal condition. */
   | { type: 'goal.evaluated'; turn: number; verdict: 'met' | 'not_yet' | 'impossible'; reason: string }
+  /** The model replaced its plan with todo_write; `todos` is the whole current list. */
+  | { type: 'todo.updated'; todos: TodoItem[] }
+
+/** One step of the model's plan (todo_write). */
+export interface TodoItem {
+  content: string
+  status: 'pending' | 'in_progress' | 'done'
+}
 
 /** Terminal outcome of an agent run. */
 export interface AgentResult {
@@ -161,7 +169,8 @@ export interface AgentResult {
 export interface ModelProvider {
   readonly name: string
   readonly model: string
-  stream(messages: ChatMessage[], tools: ToolSpec[], signal: AbortSignal): AsyncIterable<StreamChunk>
+  /** `cacheKey`: stable per-session id (never user data) for providers with prompt-cache routing. */
+  stream(messages: ChatMessage[], tools: ToolSpec[], signal: AbortSignal, opts?: { cacheKey?: string }): AsyncIterable<StreamChunk>
 }
 
 export const AGENT_MODES: readonly AgentMode[] = ['build', 'plan', 'ask']
