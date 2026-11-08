@@ -134,6 +134,13 @@ export type RunEvent =
   | { type: 'context.compacted'; phase: 'prune' | 'summary'; beforeTokens: number; afterTokens: number }
   /** The model failed (overloaded, rate limit after retries, quota, network); the rest of the turn uses `to` (`provider/model`). */
   | { type: 'provider.fallback'; from: string; to: string; reason: string }
+  /**
+   * The run looks stuck: loop detection refused a call ('loop'), run_tests failed 3 times in a row without fewer
+   * failures ('tests_failing'), or 2 model turns in a row had cut-off or invalid tool calls ('invalid_calls').
+   */
+  | { type: 'run.stuck'; reason: 'loop' | 'tests_failing' | 'invalid_calls'; detail: string }
+  /** A stuck run moved to a stronger model (`provider/model`) for the rest of the turn (roles.escalation). */
+  | { type: 'provider.escalated'; from: string; to: string; reason: string }
   /** The guardian reviewed an approval: allow skips the prompt, deny asks the human, disabled turns it off for the session. */
   | { type: 'approval.guardian'; decision: 'allow' | 'deny' | 'disabled'; action: string; reason: string }
   /** Goal mode: the evaluator judged turn `turn` (1-based) against the goal condition. */
