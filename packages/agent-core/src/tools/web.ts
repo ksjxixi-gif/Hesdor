@@ -42,7 +42,8 @@ export interface WebFetchOptions {
 
 // Zero-width, bidi controls, soft hyphen, Unicode tag characters (ASCII smuggling) and C0
 // controls other than tab and newline: all ways to hide instructions from a human reader.
-const HIDDEN_CHARS = /[­᠎​-‏‪-‮⁠-⁤⁦-⁩﻿\u{E0000}-\u{E007F}\u0000-\u0008\u000B-\u001F\u007F]/gu
+// oxlint-disable-next-line no-control-regex -- matching C0 controls is the point of this pattern
+const HIDDEN_CHARS = /[\u00AD\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF\u{E0000}-\u{E007F}\u0000-\u0008\u000B-\u001F\u007F]/gu
 
 export function stripHidden(text: string): string {
   return text.replace(/\r\n?/g, '\n').replace(HIDDEN_CHARS, '')
