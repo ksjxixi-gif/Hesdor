@@ -1,6 +1,6 @@
 # Permissions and safety
 
-Hesdor runs on your machine with your user's rights. It has no OS-level sandbox; instead it contains paths, classifies commands, asks before risky actions and lets you write rules. This page lists what each layer does.
+Hesdor runs on your machine with your user's rights. It contains paths, classifies commands, asks before risky actions and lets you write rules, and can run commands in an optional OS sandbox (off by default). This page lists what each layer does.
 
 ## Modes
 
@@ -46,6 +46,30 @@ In the interactive UI, commands outside a small safe list (read-only git, `ls`, 
 Check a command with `hesdor policy check`:
 
 ![hesdor policy check git push --force](assets/screens/policy-check.svg)
+
+## Sandbox
+
+`run_command` and background jobs can run inside an OS sandbox. Set it in your user `config.json`:
+
+```json
+{ "sandbox": { "mode": "workspace-write", "network": "off", "failIfUnavailable": false } }
+```
+
+| Key | Values |
+|---|---|
+| `mode` | `off` (default), `workspace-write` (writes only inside the workspace and a temp dir), `read-only` (writes only to a temp dir) |
+| `network` | `off` (default), `on`, or `allowlist` with `allowDomains`. The allowlist is **not enforced yet**: with `allowlist` the network stays off. |
+| `failIfUnavailable` | `true` refuses to run commands when the sandbox cannot be set up; otherwise they run unsandboxed (and ask as usual) |
+
+- **Linux:** [bubblewrap](https://github.com/containers/bubblewrap) (`bwrap`, e.g. `sudo apt-get install bubblewrap`). `/` is mounted read-only, `/tmp` is private, `/dev` and `/proc` are fresh, the workspace is writable, and the command gets its own network namespace unless `network` is `on`. On Ubuntu 24.04+ AppArmor can block bwrap's user namespaces; `hesdor doctor` shows the error.
+- **macOS:** Seatbelt (`sandbox-exec`, built in) with a generated profile: writes are allowed only in the workspace and temp dirs, and IP networking is denied unless `network` is `on`.
+- **Windows:** not supported yet. A configured sandbox prints a warning and commands run unsandboxed, unless `failIfUnavailable` makes them refuse.
+
+In `workspace-write` mode `.git/hooks` and `.git/config` stay read-only, because git runs programs from them outside the sandbox. Reads are not restricted, so a sandboxed command can read files in your home directory; with the network off it cannot send them anywhere. Tools that write caches in your home directory (for example `go build` into `~/.cache`) fail in the sandbox.
+
+While the sandbox works, a command that would only ask because no rule covers it runs without a prompt: the sandbox replaces the prompt. Deny rules, ask rules and built-in risky classifications (`rm -rf`, `git push --force`, `curl`, shells, inline code, ...) still apply, and approved commands also run inside the sandbox. When a sandboxed command fails with a permission or network error, its result names the sandbox rule that blocked it. `hesdor doctor` shows whether the sandbox is configured and available.
+
+Project `.hesdor/config.json` (trusted workspaces only) can only make the sandbox stricter, and managed settings can set a `sandbox` floor that user and project config cannot go below. The sandbox is off by default while the feature is new.
 
 ## Approvals
 
