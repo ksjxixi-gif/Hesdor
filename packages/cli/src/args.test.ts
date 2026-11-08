@@ -21,4 +21,8 @@ describe('headless and session flags', () => {
     expect(helpText()).toMatch(/3 provider error/)
     expect(helpText()).toMatch(/--output-format/)
   })
+
+  it('fits help in 80 columns', () => {
+    expect(helpText().split('\n').filter((l) => l.length > 80)).toEqual([])
+  })
 })
