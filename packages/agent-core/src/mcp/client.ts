@@ -1,14 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import {
-  Client,
-  SdkError,
-  SdkErrorCode,
-  StreamableHTTPClientTransport,
-  deserializeMessage,
-  serializeMessage,
-} from '@modelcontextprotocol/client'
-import type { ElicitRequest, ElicitResult, JSONRPCMessage, Transport } from '@modelcontextprotocol/client'
+import type { Client, ElicitRequest, ElicitResult, JSONRPCMessage, Transport } from '@modelcontextprotocol/client'
 import { childEnv, killChild, needsWindowsShell, windowsQuoteJoin } from '../exec.js'
 import { McpOAuthProvider } from './oauth.js'
 import type { McpOAuthOptions } from './oauth.js'
@@ -67,6 +59,9 @@ const PROBE_TIMEOUT_MS = 3_000
 const STDERR_TAIL_CHARS = 2_000
 const DECLINE: ElicitResult = { action: 'decline' }
 
+/** The MCP SDK (~1 MB with its deps), loaded on the first connect so runs without MCP servers never pay for it. */
+let sdk: typeof import('@modelcontextprotocol/client')
+
 /**
  * stdio transport that spawns the server itself, so it gets Hesdor's scrubbed
  * environment and cmd.exe argument refusal instead of the SDK's cross-spawn.
@@ -107,7 +102,7 @@ class StdioTransport implements Transport {
       if (line.trim() === '') return
       let message: JSONRPCMessage
       try {
-        message = deserializeMessage(line)
+        message = sdk.deserializeMessage(line)
       } catch {
         return // stray non-protocol output must not kill the session
       }
@@ -128,7 +123,7 @@ class StdioTransport implements Transport {
     return new Promise((resolve, reject) => {
       const stdin = this.proc?.stdin
       if (!stdin?.writable) return reject(new Error('server process is not running'))
-      stdin.write(serializeMessage(message), (err) => (err ? reject(err) : resolve()))
+      stdin.write(sdk.serializeMessage(message), (err) => (err ? reject(err) : resolve()))
     })
   }
 
@@ -186,6 +181,8 @@ export class McpClient {
 
   private async open(timeoutMs: number): Promise<void> {
     if (!this.config.url && !this.config.command) throw new Error('MCP server config needs "command" or "url"')
+    sdk ??= await import('@modelcontextprotocol/client')
+    const { SdkError, SdkErrorCode } = sdk
     try {
       await this.attempt(timeoutMs, false)
     } catch (err) {
@@ -207,9 +204,9 @@ export class McpClient {
     const staticAuth = Object.keys(headers ?? {}).some((h) => h.toLowerCase() === 'authorization')
     if (url && this.name && !staticAuth) this.oauth ??= new McpOAuthProvider(this.name, url, { oauth: this.config.oauth })
     const transport: Transport = url
-      ? new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers }, ...(this.oauth ? { authProvider: this.oauth } : {}) })
+      ? new sdk.StreamableHTTPClientTransport(new URL(url), { requestInit: { headers }, ...(this.oauth ? { authProvider: this.oauth } : {}) })
       : new StdioTransport({ ...this.config, command: command! })
-    const client = new Client(
+    const client = new sdk.Client(
       { name: 'hesdor', version: '0.1.0' },
       {
         // Form mode only: URL mode needs a consent UI that shows the full URL first.
