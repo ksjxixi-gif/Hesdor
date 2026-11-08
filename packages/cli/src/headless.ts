@@ -10,7 +10,7 @@ import { runGoal } from './goal.js'
 import type { GoalResult } from './goal.js'
 import { createSelectedProvider, headlessRefusal, markHeadless, resolveSelection } from './provider-setup.js'
 import { agentProviderFor, prettySummary, resolveWorkspaceRoot, runTurn, systemPromptFor } from './run.js'
-import type { TurnResult } from './run.js'
+import type { Escalation, TurnResult } from './run.js'
 import { resolveRoles } from './roles.js'
 import type { Roles } from './roles.js'
 import { createSession } from './session.js'
@@ -35,6 +35,14 @@ export interface HeadlessResult {
   steps: number
   error: string | null
   error_category: string | null
+  /** Provider id of the main model at the start of the run. */
+  provider?: string
+  /** `provider/model` of the main model at the start of the run (escalations can switch it later). */
+  model?: string
+  /** Active model profile (--profile, HESDOR_PROFILE or config), null when none. */
+  profile?: string | null
+  /** Switches to a stronger model because the run was stuck (economy and balanced profiles, roles.escalation). */
+  escalations?: Escalation[]
   /** --goal only: how the goal loop ended (met, impossible, max_turns, or the stopping turn's status). */
   goal?: { status: GoalResult['status']; reason: string; turns: number }
 }
@@ -116,6 +124,8 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
   let providerId: string
   let providerFor: ((model: string) => Promise<ModelProvider>) | undefined
   let roles: Roles | undefined
+  let profile: string | undefined
+  let oracle: string | undefined
   if (deps.provider) {
     provider = deps.provider
     providerId = deps.provider.name
@@ -144,6 +154,8 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
       if (sel.providerId === 'chatgpt' && format === 'text') warn(`using your ChatGPT plan (manage usage: ${CHATGPT_USAGE_URL})`)
       providerFor = agentProviderFor(flags, cfg, sel) // subagents with their own `model:` use that provider's key
       roles = await resolveRoles(flags, cfg, sel, { headless: true })
+      profile = cfg.profile
+      oracle = cfg.roles?.oracle ?? ''
       for (const w of roles.warnings) warn(w)
     } catch (err) {
       return fail(1, err instanceof Error ? err.message : String(err), 'config')
@@ -186,6 +198,7 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
     },
     // Headless never prompts: only a pinned approval or an explicit flag loads project code.
     trust: async (_files, print) => flags.trustWorkspace === true || (await isTrusted(root, print)),
+    ...(oracle !== undefined ? { oracle } : {}),
   })
   const controller = new AbortController()
   const onSigint = (): void => controller.abort()
@@ -238,6 +251,9 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
       case 'provider.fallback':
         console.error(`${YELLOW}• ${event.from} failed (${event.reason}); continuing with ${event.to}${RESET}`)
         break
+      case 'provider.escalated':
+        console.error(`${DIM}• stuck (${event.reason.replace('_', ' ')}): escalating from ${event.from} to ${event.to}${RESET}`)
+        break
       case 'approval.guardian':
         console.error(`${event.decision === 'allow' ? DIM : YELLOW}• guardian ${event.decision}: ${event.action} (${event.reason})${RESET}`)
         break
@@ -269,6 +285,7 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
         ...(resumed ? { resumed: true } : {}),
         provider: providerId,
         model: provider.model,
+        ...(profile ? { profile } : {}),
         mode,
         root,
         tools: session.registry.list().map((t) => t.name),
@@ -283,6 +300,7 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
     let turns = 0
     let spentUsd = 0
     let compacted = false
+    const escalations: Escalation[] = []
     const turn = async (turnPrompt: string, turnEmit: (event: RunEvent) => void): Promise<TurnResult> => {
       if (turns++ > 0 && format === 'text' && !deps.report) process.stdout.write('\n')
       const r = await runTurn({
@@ -313,6 +331,7 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
       turnHistory = r.messages.filter((m) => m.role !== 'system')
       spentUsd += r.costUsd ?? 0
       compacted ||= r.compacted === true
+      escalations.push(...(r.escalations ?? []))
       return r
     }
     const goal =
@@ -389,6 +408,10 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
         steps: result.steps,
         error: result.error ?? (goal?.status === 'failed' ? goal.reason : null),
         error_category: result.errorKind ?? (status === 'failed' ? 'agent' : null),
+        provider: providerId,
+        model: `${providerId}/${provider.model}`,
+        profile: profile ?? null,
+        escalations,
         ...(goal ? { goal: { status: goal.status, reason: goal.reason, turns: goal.turns } } : {}),
       } satisfies HeadlessResult)
     }
