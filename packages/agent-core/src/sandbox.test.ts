@@ -40,7 +40,9 @@ describe('sandbox argv and profiles (pure, every OS)', () => {
     expect(p).toContain('(deny file-write* (subpath "/Users/me/my \\"repo\\"/.git/hooks")')
     expect(p).toContain('(deny network-outbound (remote ip "*:*"))')
     const ro = seatbeltProfile({ mode: 'read-only', network: 'on' }, '/w', ['/private/tmp'])
-    expect(ro).not.toContain('"/w"')
+    // The workspace is never allowed, and is denied after the temp allowance (it may live inside a temp dir).
+    expect(ro).not.toMatch(/\(allow file-write\*[^\n]*"\/w"/)
+    expect(ro.trim().split('\n').some((l) => l === '(deny file-write* (subpath "/w"))')).toBe(true)
     expect(ro).not.toContain('network')
     const argv = sandboxArgv(['make'], WS, 'seatbelt', '/w', '/w', ['/private/tmp'])
     expect(argv[0]).toBe('/usr/bin/sandbox-exec')
