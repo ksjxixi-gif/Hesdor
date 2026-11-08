@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createDefaultRegistry, createOracleTool } from '@hesdor/agent-core'
-import { ProviderError } from '@hesdor/providers'
+import { getModelInfo, ProviderError, requestCostUsd } from '@hesdor/providers'
 import type { ChatMessage, ModelProvider, ProviderErrorKind, RunEvent, StreamChunk, ToolSpec } from '@hesdor/protocol'
 import type { CliFlags } from './args.js'
 import type { ProviderSelection } from './provider-setup.js'
@@ -191,5 +191,81 @@ describe('oracle tool', () => {
     await result
     expect(oracle.requests).toHaveLength(0)
     expect(events.some((e) => e.type === 'tool.failed' && e.name === 'oracle')).toBe(true)
+  })
+})
+
+describe('escalation', () => {
+  const same = (id: string) => call(id, 'list_files', {})
+  const escalated = (events: RunEvent[]) => events.filter((e) => e.type === 'provider.escalated')
+
+  it('moves a looping run to the next stronger model and reports it', async () => {
+    const main = new ScriptedProvider([same('a'), same('b'), same('c')], 'main', 'm1')
+    const strong = new ScriptedProvider([answer('done')], 'strong', 's1')
+    const { result, events } = turn(main, { roles: { escalation: [strong] } })
+    const r = await result
+    expect(r.status).toBe('completed')
+    expect(main.requests).toHaveLength(3)
+    expect(strong.requests).toHaveLength(1)
+    expect(escalated(events)).toEqual([{ type: 'provider.escalated', from: 'main/m1', to: 'strong/s1', reason: 'loop' }])
+    expect(r.escalations).toEqual([{ from: 'main/m1', to: 'strong/s1', reason: 'loop', step: 3 }])
+  })
+
+  it('escalates on 2 turns of invalid tool calls', async () => {
+    const main = new ScriptedProvider([call('u1', 'no_such_tool', {}), call('u2', 'no_such_tool', {})], 'main', 'm1')
+    const strong = new ScriptedProvider([answer('done')], 'strong', 's1')
+    const { result, events } = turn(main, { roles: { escalation: [strong] } })
+    expect((await result).status).toBe('completed')
+    expect(escalated(events)[0]).toMatchObject({ reason: 'invalid_calls' })
+  })
+
+  it('escalates at most twice per turn, never back down, and gives the new model two steps first', async () => {
+    const main = new ScriptedProvider([same('a'), same('b'), same('c')], 'main', 'm1')
+    // s1 loops at once: its first refusal (step 4) is inside the grace window, the second (step 5) escalates.
+    const s1 = new ScriptedProvider([same('d'), same('e')], 's1', 'x1')
+    const s2 = new ScriptedProvider([same('f'), same('g'), answer('done')], 's2', 'x2')
+    const s3 = new ScriptedProvider([answer('never')], 's3', 'x3')
+    const { result } = turn(main, { roles: { escalation: [s1, s2, s3] } })
+    const r = await result
+    expect(r.status).toBe('completed')
+    expect(r.escalations?.map((e) => [e.to, e.step])).toEqual([['s1/x1', 3], ['s2/x2', 5]])
+    expect(s2.requests).toHaveLength(3)
+    expect(s3.requests).toHaveLength(0)
+  })
+
+  it('prices the escalated model at its own price, within the budget', async () => {
+    const main = new ScriptedProvider([same('a'), same('b'), same('c')], 'deepseek', 'deepseek-flash')
+    const big = { inputTokens: 1_000_000, outputTokens: 0, totalTokens: 1_000_000, ready: true as const }
+    const strong = new ScriptedProvider(
+      [[{ type: 'tool_call', index: 0, id: 'x', name: 'list_files', argumentsDelta: '{"path":"."}' }, { type: 'finish', reason: 'tool_calls', usage: big }]],
+      'anthropic',
+      'claude-opus-5-5',
+    )
+    const { result } = turn(main, { roles: { escalation: [strong] }, budgetUsd: 1 })
+    const r = await result
+    const cheap = requestCostUsd(usage(11), getModelInfo('deepseek', 'deepseek-flash'))!
+    const dear = requestCostUsd(big, getModelInfo('anthropic', 'claude-opus-5-5'))!
+    expect(dear).toBeGreaterThan(1)
+    expect(r.costUsd).toBeCloseTo(3 * cheap + dear, 10)
+    // The escalated model's cost counts toward the budget: the next request is refused.
+    expect(r.status).toBe('budget_exceeded')
+  })
+
+  it('needs a key for every escalation model and is off with escalate: false', async () => {
+    const flags: CliFlags = { yes: false, debug: false, force: false, version: false, help: false }
+    const current: ProviderSelection = { providerId: 'openai', kind: 'openai', model: 'main', apiKey: 'sk-main', keySource: 'environment', envKey: 'OPENAI_API_KEY' }
+    const saved = process.env.ANTHROPIC_API_KEY
+    try {
+      delete process.env.ANTHROPIC_API_KEY
+      const cfg = { roles: { escalation: ['anthropic/claude-opus-5-5'] } }
+      const keyless = await resolveRoles(flags, cfg, current)
+      expect(keyless.escalation).toBeUndefined()
+      expect(keyless.warnings[0]).toMatch(/escalation 1 model anthropic\/claude-opus-5-5 is unavailable: anthropic needs an API key/)
+      process.env.ANTHROPIC_API_KEY = 'sk-ant'
+      expect((await resolveRoles(flags, cfg, current)).escalation?.map((p) => p.model)).toEqual(['claude-opus-5-5'])
+      expect((await resolveRoles(flags, { ...cfg, escalate: false }, current)).escalation).toBeUndefined()
+    } finally {
+      if (saved === undefined) delete process.env.ANTHROPIC_API_KEY
+      else process.env.ANTHROPIC_API_KEY = saved
+    }
   })
 })
