@@ -1,4 +1,4 @@
-import { createWorktree, findGitRoot, removeWorktreeIfUnchanged, stopAllJobs } from '@hesdor/agent-core'
+import { createWorktree, findGitRoot, removeWorktreeIfUnchanged, renderTodos, stopAllJobs } from '@hesdor/agent-core'
 import type { Worktree } from '@hesdor/agent-core'
 import { CHATGPT_USAGE_URL, getModelInfo } from '@hesdor/providers'
 import { writeFile } from 'node:fs/promises'
@@ -232,6 +232,9 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
       case 'context.compacted':
         console.error(`${DIM}• context compacted (${event.phase}): ~${event.beforeTokens} → ~${event.afterTokens} tokens${RESET}`)
         break
+      case 'todo.updated':
+        console.error(`${DIM}• plan\n${renderTodos(event.todos)}${RESET}`)
+        break
       case 'provider.fallback':
         console.error(`${YELLOW}• ${event.from} failed (${event.reason}); continuing with ${event.to}${RESET}`)
         break
@@ -283,6 +286,7 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
     const turn = async (turnPrompt: string, turnEmit: (event: RunEvent) => void): Promise<TurnResult> => {
       if (turns++ > 0 && format === 'text' && !deps.report) process.stdout.write('\n')
       const r = await runTurn({
+        trustWorkspace: flags.trustWorkspace,
         provider,
         registry: session.registry,
         plugins: session.plugins,
@@ -320,6 +324,7 @@ export async function runHeadless(mode: AgentMode, prompt: string, flags: CliFla
             evaluator: roles?.small ?? provider,
             emit,
             signal: controller.signal,
+            onEvaluatorCost: (usd) => (spentUsd += usd),
             ...(flags.maxGoalTurns ? { maxTurns: flags.maxGoalTurns } : {}),
           })
         : undefined
