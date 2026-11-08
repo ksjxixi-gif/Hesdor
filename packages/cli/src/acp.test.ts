@@ -6,6 +6,7 @@ import * as acp from '@agentclientprotocol/sdk'
 import type { ChatMessage, ModelProvider, StreamChunk, ToolSpec } from '@hesdor/protocol'
 import type { CliFlags } from './args.js'
 import { createAcpAgent, promptText } from './acp.js'
+import type { Roles } from './roles.js'
 
 // Sessions and config land in a throwaway profile (own worker per test file).
 process.env.APPDATA = process.env.XDG_CONFIG_HOME = mkdtempSync(path.join(tmpdir(), 'hesdor-home-'))
@@ -44,6 +45,7 @@ async function withClient<T>(
   provider: ModelProvider,
   permission: (req: acp.RequestPermissionRequest) => acp.RequestPermissionResponse,
   op: (ctx: acp.ClientContext, updates: acp.SessionUpdate[], permissions: acp.RequestPermissionRequest[]) => Promise<T>,
+  roles?: Roles,
 ): Promise<T> {
   const updates: acp.SessionUpdate[] = []
   const permissions: acp.RequestPermissionRequest[] = []
@@ -56,7 +58,7 @@ async function withClient<T>(
       permissions.push(params)
       return permission(params)
     })
-  return client.connectWith(createAcpAgent(flags, { provider }), async (ctx) => {
+  return client.connectWith(createAcpAgent(flags, { provider, ...(roles ? { roles } : {}) }), async (ctx) => {
     const init = await ctx.request('initialize', { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: {} })
     expect(init.protocolVersion).toBe(acp.PROTOCOL_VERSION)
     return op(ctx, updates, permissions)
@@ -148,6 +150,45 @@ describe('hesdor acp', () => {
         { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'hi there' } },
         { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'first answer' } },
       ])
+    })
+  })
+
+  it('falls back via the session roles and sends todos as a plan and switches as notices', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'hesdor-acp-'))
+    const down: ModelProvider = {
+      name: 'down',
+      model: 'm1',
+      // eslint-disable-next-line require-yield
+      async *stream() {
+        throw Object.assign(new Error('overloaded'), { kind: 'overloaded', retryable: false })
+      },
+    }
+    const backup = new ScriptedProvider([
+      [
+        { type: 'tool_call', index: 0, id: 't1', name: 'todo_write', argumentsDelta: JSON.stringify({ todos: [{ content: 'fix bug', status: 'in_progress' }, { content: 'test', status: 'done' }] }) },
+        { type: 'finish', reason: 'tool_calls' },
+      ],
+      answer('done'),
+    ])
+    const roles: Roles = { fallback: [backup], status: [], warnings: [] }
+    const { stop, updates } = await withClient(
+      down,
+      pick('allow_once'),
+      async (ctx, updates) => {
+        const { sessionId } = await ctx.request('session/new', { cwd, mcpServers: [] })
+        const stop = await ctx.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: 'go' }] })
+        return { stop, updates }
+      },
+      roles,
+    )
+    expect(stop.stopReason).toBe('end_turn')
+    expect(updates.find((u) => u.sessionUpdate === 'notice' && /down\/m1 unavailable \(overloaded\): scripted\/fake-model/.test(u.description ?? ''))).toBeTruthy()
+    expect(updates.find((u) => u.sessionUpdate === 'plan')).toEqual({
+      sessionUpdate: 'plan',
+      entries: [
+        { content: 'fix bug', priority: 'medium', status: 'in_progress' },
+        { content: 'test', priority: 'medium', status: 'completed' },
+      ],
     })
   })
 
