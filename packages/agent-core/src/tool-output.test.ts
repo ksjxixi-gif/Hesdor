@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import type { ChatMessage } from '@hesdor/protocol'
 import { PRUNED, pruneToolResults } from './compact.js'
 import type { ToolContext } from './context.js'
 import { createDefaultRegistry } from './registry.js'
-import { capOutput, formatToolResult } from './tool-output.js'
+import { capOutput, cleanSpillDir, formatToolResult } from './tool-output.js'
 
 function ctxFor(root: string): ToolContext {
   return {
@@ -92,5 +92,48 @@ describe('pruneToolResults', () => {
     expect(messages.map((m) => m.toolCallId)).toEqual(msgs.map((m) => m.toolCallId))
     expect(messages.filter((m) => m.content === PRUNED).map((m) => m.toolCallId)).toEqual(['c0', 'c1', 'c2'])
     expect(msgs[2]!.content).not.toBe(PRUNED) // the input is not mutated
+  })
+})
+
+describe('cleanSpillDir', () => {
+  const OLD = new Date(Date.now() - 8 * 86_400_000)
+  const old = (file: string): void => {
+    writeFileSync(file, 'x')
+    utimesSync(file, OLD, OLD)
+  }
+
+  it('deletes spill files older than 7 days, only inside .hesdor/out', async () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'hesdor-spill-'))
+    const out = path.join(root, '.hesdor', 'out')
+    mkdirSync(path.join(out, 'sub'), { recursive: true })
+    old(path.join(out, 'a.txt'))
+    writeFileSync(path.join(out, 'fresh.txt'), 'x')
+    old(path.join(out, '.gitignore'))
+    old(path.join(out, 'sub', 'nested.txt'))
+    old(path.join(root, '.hesdor', 'config.json'))
+    old(path.join(root, 'outside.txt'))
+    expect(await cleanSpillDir(root)).toBe(1)
+    expect(existsSync(path.join(out, 'a.txt'))).toBe(false)
+    for (const kept of [path.join(out, 'fresh.txt'), path.join(out, '.gitignore'), path.join(out, 'sub', 'nested.txt'), path.join(root, '.hesdor', 'config.json'), path.join(root, 'outside.txt')]) {
+      expect(existsSync(kept), kept).toBe(true)
+    }
+    expect(await cleanSpillDir(path.join(root, 'missing'))).toBe(0)
+  })
+
+  it('never follows a symlinked .hesdor/out or .hesdor', async () => {
+    const elsewhere = mkdtempSync(path.join(tmpdir(), 'hesdor-spill-target-'))
+    old(path.join(elsewhere, 'precious.txt'))
+    mkdirSync(path.join(elsewhere, 'out'))
+    old(path.join(elsewhere, 'out', 'precious.txt'))
+    // Junctions need no privileges on Windows; elsewhere they are plain directory symlinks.
+    const a = mkdtempSync(path.join(tmpdir(), 'hesdor-spill-'))
+    mkdirSync(path.join(a, '.hesdor'))
+    symlinkSync(elsewhere, path.join(a, '.hesdor', 'out'), 'junction')
+    const b = mkdtempSync(path.join(tmpdir(), 'hesdor-spill-'))
+    symlinkSync(elsewhere, path.join(b, '.hesdor'), 'junction')
+    expect(await cleanSpillDir(a)).toBe(0)
+    expect(await cleanSpillDir(b)).toBe(0)
+    expect(existsSync(path.join(elsewhere, 'precious.txt'))).toBe(true)
+    expect(existsSync(path.join(elsewhere, 'out', 'precious.txt'))).toBe(true)
   })
 })
