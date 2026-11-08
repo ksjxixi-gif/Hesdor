@@ -11,7 +11,7 @@ Type `/` to open the command palette; Enter runs the highlighted entry. Read-onl
 | Command | What it does |
 |---|---|
 | `/help` | list commands |
-| `/model`, `/provider` | pick a model (searchable) or switch provider |
+| `/model`, `/provider` | pick a model (searchable) or switch provider; while a [profile](roles.md#profiles) picks the model, `/model` lasts for the session (keep it with `hesdor config set profile none` or `-m`) |
 | `/mode build\|plan\|ask` | switch mode (plan and ask are read-only) |
 | `/effort low\|medium\|high\|default` | reasoning effort for this session |
 | `/status` | session, model, cost and tokens |
@@ -39,6 +39,8 @@ Every file write opens a diff review: `y` applies, `n` rejects, Shift+A allows w
 ## Rewind
 
 Each turn is checkpointed. `/rewind` lists the turns of this session; pick one, then choose files, chat or both. Running `/rewind` again offers to undo the last rewind.
+
+Rewinding the chat continues in a new session linked to the old one, so the full transcript stays saved and `/sessions` lists both. `/rewind` in the new session still lists the old session's turns up to the rewind point (until `/new`, `/clear`, `/compact` or `/resume`).
 
 ![The /rewind picker](assets/screens/tui-rewind.svg)
 
