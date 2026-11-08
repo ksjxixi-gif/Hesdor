@@ -27,6 +27,9 @@ class HesdorRun:
     n_output_tokens: int | None = None
     n_cache_tokens: int | None = None
     cost_usd: float | None = None
+    profile: str | None = None
+    # Number of model escalations the routing profile made (`escalations` may be a count or a list).
+    escalations: int | None = None
     raw: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -57,6 +60,9 @@ def parse_run(stdout: str) -> HesdorRun:
     cost = result.get("cost_usd")
     if cost is None:
         cost = usage.get("costUsd")
+    esc = result.get("escalations")
+    if isinstance(esc, list):
+        esc = len(esc)
     outcome = OUTCOMES.get(exit_code, "failed") if exit_code is not None else "failed"
     # A run that died before printing a result (crash, OOM, missing binary) is an infra failure too.
     if not result and exit_code not in (0, None):
@@ -72,5 +78,7 @@ def parse_run(stdout: str) -> HesdorRun:
         n_output_tokens=usage.get("outputTokens"),
         n_cache_tokens=usage.get("cacheReadTokens"),
         cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
+        profile=result.get("profile"),
+        escalations=esc if isinstance(esc, int) and not isinstance(esc, bool) else None,
         raw=result,
     )
