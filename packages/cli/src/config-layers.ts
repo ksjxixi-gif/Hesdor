@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises'
 import path from 'node:path'
-import { findGitRoot, validateRules } from '@hesdor/agent-core'
-import type { PermissionRules } from '@hesdor/agent-core'
+import { findGitRoot, sandboxOn, stricterSandbox, validateRules, validateSandbox } from '@hesdor/agent-core'
+import type { ChecksConfig, PermissionRules, SandboxConfig } from '@hesdor/agent-core'
 import { getPreset } from '@hesdor/providers'
 import type { CliFlags } from './args.js'
 import { configFile, loadConfig, modelIdError, PROVIDER_ID_RE, readJsonObject, saveConfig } from './config.js'
@@ -31,6 +31,8 @@ export interface ManagedSettings {
   disableMcp?: boolean
   /** Forced ask/deny rules (an allow list here is refused). */
   permissions?: Pick<PermissionRules, 'ask' | 'deny'>
+  /** Sandbox floor: user and project config can only make it stricter. */
+  sandbox?: SandboxConfig
 }
 
 type Scalar = 'provider' | 'model' | 'maxTokens' | 'effort' | 'mode' | 'updateCheck'
@@ -87,6 +89,7 @@ export async function loadManagedSettings(file = managedSettingsPath()): Promise
     const rules = validateRules(raw.permissions, file)
     if (rules.allow) bad('permissions', 'may only contain ask and deny rules')
   }
+  validateSandbox(raw.sandbox, file)
   return raw as ManagedSettings
 }
 
@@ -133,6 +136,11 @@ export function mergeLayers(input: LayerInput): EffectiveConfig {
       delete config[k]
     }
   }
+  if (config.sandbox !== undefined) config.sandbox = validateSandbox(config.sandbox, 'config.json')
+  if (config.checks !== undefined && checksError(config.checks)) {
+    warnings.push(`config.json: checks ${checksError(config.checks)}; ignored`)
+    delete config.checks
+  }
 
   // A model from a project, env or managed layer belongs to the provider already chosen, never a new one.
   const set = (k: Scalar, value: unknown, layer: Layer): void => {
@@ -162,6 +170,22 @@ export function mergeLayers(input: LayerInput): EffectiveConfig {
 
   for (const [key, value] of Object.entries(input.project ?? {})) {
     if (key === '$schema') continue
+    if (key === 'checks') {
+      // Checks run commands, but this file loads only in trusted workspaces and is in the trust fingerprint.
+      const error = checksError(value)
+      if (error) warnings.push(`.hesdor/config.json: checks ${error}; ignored`)
+      else {
+        config.checks = { ...config.checks, ...(value as ChecksConfig) }
+        sources.checks = 'project'
+      }
+      continue
+    }
+    if (key === 'sandbox') {
+      // A repository may only tighten the sandbox (stricterSandbox), never loosen it.
+      config.sandbox = stricterSandbox(config.sandbox, validateSandbox(value, '.hesdor/config.json'))
+      sources.sandbox = 'project'
+      continue
+    }
     if (!(PROJECT_KEYS as readonly string[]).includes(key)) {
       warnings.push(`.hesdor/config.json: "${key}" cannot be set by a project and was ignored (allowed: ${PROJECT_KEYS.join(', ')})`)
       continue
@@ -194,6 +218,13 @@ export function mergeLayers(input: LayerInput): EffectiveConfig {
     config.guardian = { ...config.guardian, enabled: false }
     sources['guardian.enabled'] = 'managed'
   }
+  if (managed.sandbox) {
+    config.sandbox = stricterSandbox(managed.sandbox, config.sandbox)
+    sources.sandbox = 'managed'
+  }
+  if (sandboxOn(config.sandbox) && process.platform === 'win32') {
+    warnings.push('sandbox: the OS sandbox is not supported on Windows yet; commands run unsandboxed' + (config.sandbox.failIfUnavailable ? ' — failIfUnavailable is set, so run_command will refuse to run' : ''))
+  }
 
   const outFlags: CliFlags = { ...flags }
   if (config.mode !== undefined) outFlags.mode = config.mode
@@ -206,6 +237,28 @@ export async function projectConfigTrusted(root: string, trustFlag?: boolean): P
   const files = await projectCodeFiles(root)
   if (!files.includes(path.join(root, '.hesdor', 'config.json'))) return false
   return trustFlag === true || (await isTrusted(root, await fingerprint(root, files)))
+}
+
+/** Checks for a turn: user config, overridden per kind by a trusted project's .hesdor/config.json. */
+export async function loadChecksConfig(root: string, trustFlag?: boolean): Promise<ChecksConfig | undefined> {
+  return (await loadEffectiveConfig(NO_FLAGS, { root, trusted: await projectConfigTrusted(root, trustFlag) })).config.checks
+}
+
+/** Why a `checks` value is malformed, or undefined when it is valid. */
+export function checksError(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return 'must be an object'
+  for (const [k, v] of Object.entries(value)) {
+    if (k === 'timeoutMs') {
+      if (!Number.isInteger(v) || (v as number) < 1 || (v as number) > 600_000) return 'timeoutMs must be an integer from 1 to 600000'
+    } else if (!['format', 'lint', 'typecheck', 'test'].includes(k)) return `has an unknown key "${k}" (format, lint, typecheck, test, timeoutMs)`
+    else if (!Array.isArray(v) || !v.every((s) => typeof s === 'string' && s !== '')) return `${k} must be a list of non-empty strings (an argv)`
+  }
+  return undefined
+}
+
+/** The effective sandbox for a workspace (user, trusted project, managed), read per turn like loadPermissions. */
+export async function loadSandboxConfig(root: string, trustFlag?: boolean): Promise<SandboxConfig | undefined> {
+  return (await loadEffectiveConfig(NO_FLAGS, { root, trusted: await projectConfigTrusted(root, trustFlag) })).config.sandbox
 }
 
 /** Read every layer and merge them. `root` and `trusted` enable the project layer. */
