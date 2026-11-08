@@ -51,6 +51,8 @@ export interface CliFlags {
   redact?: boolean
   /** export/import: use the newest session. */
   latest?: boolean
+  /** doctor: send a few tiny real requests to each configured provider. */
+  live?: boolean
   version: boolean
   help: boolean
 }
@@ -82,6 +84,7 @@ export interface ParsedArgs {
     | 'upgrade'
     | 'review'
     | 'config'
+    | 'checkpoints'
   /** For run/ask/plan: the prompt. For review: optional extra focus. For model/provider/setup: an optional value. */
   prompt: string
   flags: CliFlags
@@ -112,6 +115,8 @@ Setup:
   hesdor auth logout <id>      Delete a provider's saved key
   hesdor init                  Create HESDOR.md and .hesdorignore starters
   hesdor doctor                Check environment, tools and credentials
+  hesdor doctor --live         Also send a few tiny real requests per provider
+                               (shows the cost first; -p <id> for one, --yes)
   hesdor policy check <cmd...> Show whether run_command would allow, ask or
                                deny a command, and which rule decides
   hesdor mcp list              MCP servers: scope, transport, status, login
@@ -133,6 +138,10 @@ Setup:
   hesdor config get <key>      One effective value, e.g. config get maxTokens
   hesdor config set <key> <value>
                                Save a validated value in your user config.json
+  hesdor checkpoints [list]    Turn checkpoints of this workspace (for /rewind)
+  hesdor checkpoints prune [--all]
+                               Keep the newest 100, drop those older than 30
+                               days (--all: every workspace's checkpoints)
 
 Options:
   -p, --provider <name>        Provider preset (openai, anthropic, openrouter,
@@ -273,6 +282,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case 'policy':
       case 'mcp':
       case 'config':
+      case 'checkpoints':
         // `hesdor policy check git push -f`, `hesdor mcp add fs npx -y pkg`: the rest is verbatim.
         if (command === 'interactive' && positional.length === 0) {
           return { command: arg, prompt: argv.join(' '), flags, args: argv.splice(0) }
@@ -335,6 +345,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
       }
       case '--redact':
         flags.redact = true
+        break
+      case '--live':
+        flags.live = true
         break
       case '--latest':
         flags.latest = true
@@ -445,6 +458,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   const prompt = positional.join(' ')
   if ((flags.goal !== undefined || flags.maxGoalTurns !== undefined) && command !== 'run') throw new Error('--goal works with run')
+  if (flags.live && command !== 'doctor') throw new Error('--live works with doctor')
   if (flags.worktree !== undefined && command !== 'run' && command !== 'ask' && command !== 'plan') {
     throw new Error('--worktree works with run, ask and plan')
   }
