@@ -9,7 +9,9 @@ import { VERSION } from './args.js'
 import type { CliFlags } from './args.js'
 import { loadEffectiveConfig, loadManagedSettings, providerBlocked } from './config-layers.js'
 import { createSelectedProvider, resolveSelection } from './provider-setup.js'
-import { prettySummary, resolveWorkspaceRoot, runTurn, systemPromptFor } from './run.js'
+import { resolveRoles } from './roles.js'
+import type { Roles } from './roles.js'
+import { agentProviderFor, prettySummary, resolveWorkspaceRoot, runTurn, systemPromptFor } from './run.js'
 import { createSession } from './session.js'
 import type { Session } from './session.js'
 import { findSession, newSessionId, saveSession, titleFrom } from './sessions.js'
@@ -55,9 +57,14 @@ interface AcpSession {
   session: Session
   extraMcp: Awaited<ReturnType<typeof registerMcpServers>>
   provider: ModelProvider
+  /** Resolved once per session: the guardian's breaker state lives in it. */
+  roles?: Roles
+  providerFor?: (model: string) => Promise<ModelProvider>
   mode: AgentMode
   history: ChatMessage[]
   createdAt?: number
+  /** Saved session this one continues (set when a compaction archived the full transcript). */
+  parentId?: string
   /** Warnings from session setup, shown as notices once the client knows the session. */
   notices: string[]
   controller?: AbortController
@@ -70,6 +77,7 @@ interface AcpSession {
 /** Test seam: a scripted provider instead of the configured one. */
 export interface AcpDeps {
   provider?: ModelProvider
+  roles?: Roles
 }
 
 function modeOption(mode: AgentMode): acp.SessionConfigOption {
@@ -120,26 +128,40 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
   const sessions = new Map<string, AcpSession>()
   const log = (m: string): void => console.error(`hesdor acp: ${m}`)
 
-  async function provider(): Promise<ModelProvider> {
-    if (deps.provider) return deps.provider
+  async function selection() {
     // No workspace yet, so no project layer here; managed settings still apply.
     const eff = await loadEffectiveConfig(flags)
     const sel = await resolveSelection(eff.flags, eff.config)
     const blocked = providerBlocked(eff.managed, sel.providerId)
     if (blocked) throw acp.RequestError.invalidParams(undefined, blocked)
     if (sel.keySource === 'none') throw acp.RequestError.authRequired(undefined, SETUP_HINT)
-    return createSelectedProvider(sel)
+    return { eff, sel }
   }
 
-  async function open(cwd: string, mcpServers: acp.McpServer[], id: string, stored?: { messages: ChatMessage[]; createdAt: number }): Promise<AcpSession> {
-    const prov = await provider()
-    const ws = resolveWorkspaceRoot(cwd, flags.allowHome)
-    if ('error' in ws) throw acp.RequestError.invalidParams(undefined, ws.error)
+  /** The main model plus roles (fallback, escalation, guardian, small, subagent), as the TUI resolves them. */
+  async function models(warn: (m: string) => void): Promise<Pick<AcpSession, 'provider' | 'roles' | 'providerFor'>> {
+    if (deps.provider) return { provider: deps.provider, ...(deps.roles ? { roles: deps.roles } : {}) }
+    const { eff, sel } = await selection()
+    // Not headless: a person in the editor answers what the guardian declines, as in the TUI.
+    const roles = await resolveRoles(eff.flags, eff.config, sel)
+    for (const w of roles.warnings) warn(w)
+    return { provider: createSelectedProvider(sel), roles, providerFor: agentProviderFor(eff.flags, eff.config, sel) }
+  }
+
+  async function open(
+    cwd: string,
+    mcpServers: acp.McpServer[],
+    id: string,
+    stored?: { messages: ChatMessage[]; createdAt: number; parentId?: string },
+  ): Promise<AcpSession> {
     const notices: string[] = []
     const warn = (m: string): void => {
       log(m)
       notices.push(m)
     }
+    const chosen = await models(warn)
+    const ws = resolveWorkspaceRoot(cwd, flags.allowHome)
+    if ('error' in ws) throw acp.RequestError.invalidParams(undefined, ws.error)
     if (ws.warning) warn(ws.warning)
     const root = ws.root
     const session = await createSession({
@@ -155,10 +177,11 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
       root,
       session,
       extraMcp,
-      provider: prov,
+      ...chosen,
       mode: isMode(flags.mode) ? flags.mode : 'build',
       history: stored?.messages ?? [],
       ...(stored ? { createdAt: stored.createdAt } : {}),
+      ...(stored?.parentId ? { parentId: stored.parentId } : {}),
       notices,
       state: { activeChild: null, snapshots: [], redo: [] },
       alwaysAllow: new Set(),
@@ -205,7 +228,7 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
       ],
     }))
     .onRequest('authenticate', async () => {
-      await provider() // throws auth_required while no key is configured
+      if (!deps.provider) await selection() // throws auth_required while no key is configured
       return {}
     })
     .onRequest('session/new', async ({ params }) => {
@@ -261,7 +284,8 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
       const send = (update: acp.SessionUpdate): void => {
         queue = queue.then(() => client.notify('session/update', { sessionId: s.id, update })).catch(() => {})
       }
-      for (const n of s.notices.splice(0)) send({ sessionUpdate: 'notice', severity: 'warning', title: 'Hesdor', description: n })
+      const notice = (severity: 'info' | 'warning', description: string): void => send({ sessionUpdate: 'notice', severity, title: 'Hesdor', description })
+      for (const n of s.notices.splice(0)) notice('warning', n)
 
       // Tools run one at a time, so approvals and diffs belong to the latest started call.
       let current: string | undefined
@@ -366,6 +390,29 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
             if (current === event.callId) current = undefined
             break
           }
+          case 'todo.updated':
+            // ACP plans carry the whole list each time; Hesdor todos have no priority.
+            send({
+              sessionUpdate: 'plan',
+              entries: event.todos.map((t) => ({ content: t.content, priority: 'medium', status: t.status === 'done' ? 'completed' : t.status })),
+            })
+            break
+          case 'provider.fallback':
+            notice('warning', `${event.from} unavailable (${event.reason}): ${event.to} takes over for the rest of this turn`)
+            break
+          case 'provider.escalated':
+            notice('warning', `Stuck (${event.reason.replace('_', ' ')}): escalating from ${event.from} to ${event.to} for the rest of this turn`)
+            break
+          case 'run.stuck':
+            notice('info', `Run looks stuck (${event.reason.replace('_', ' ')}): ${event.detail}`)
+            break
+          case 'approval.guardian':
+            if (event.decision === 'disabled') notice('warning', `Guardian turned off for this session: ${event.reason}`)
+            else notice('info', `Guardian ${event.decision === 'allow' ? 'allowed' : 'declined, asking you'}: ${event.action}${event.reason ? ` (${event.reason})` : ''}`)
+            break
+          case 'context.compacted':
+            notice('info', `Context compacted (${event.phase}): ~${event.beforeTokens} → ~${event.afterTokens} tokens`)
+            break
           default:
             break
         }
@@ -388,11 +435,28 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
           approvalsEnabled: true,
           reviewChange,
           state: s.state,
+          sessionId: s.id,
+          ...(s.roles ? { roles: s.roles } : {}),
+          ...(s.providerFor ? { providerFor: s.providerFor } : {}),
           ...(flags.maxSteps ? { maxSteps: flags.maxSteps } : {}),
         })
+        const before = s.history
         s.history = result.messages.filter((m) => m.role !== 'system')
         try {
-          await saveSession(s.root, { id: s.id, messages: s.history, title: titleFrom(s.history), ...(s.createdAt ? { createdAt: s.createdAt } : {}) })
+          // The client keeps this session id, so a compacted history archives the full transcript under a new id it links to.
+          if (result.compacted && before.length > 0) {
+            const archiveId = newSessionId()
+            const created = s.createdAt ? { createdAt: s.createdAt } : {}
+            await saveSession(s.root, { id: archiveId, messages: before, title: titleFrom(before), ...created, ...(s.parentId ? { parentId: s.parentId } : {}) })
+            s.parentId = archiveId
+          }
+          await saveSession(s.root, {
+            id: s.id,
+            messages: s.history,
+            title: titleFrom(s.history),
+            ...(s.createdAt ? { createdAt: s.createdAt } : {}),
+            ...(s.parentId ? { parentId: s.parentId } : {}),
+          })
           s.createdAt ??= Date.now()
         } catch (err) {
           log(`could not save the session: ${err instanceof Error ? err.message : String(err)}`)
