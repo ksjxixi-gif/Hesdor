@@ -13,7 +13,7 @@ Other keys documented elsewhere: `permissions` ([permissions.md](permissions.md)
 
 ## Managed settings
 
-Administrators can place `managed-settings.json` in `%ProgramData%\hesdor\`, `/Library/Application Support/hesdor/` or `/etc/hesdor/` (or point `HESDOR_MANAGED_SETTINGS` at it) to lock `allowedProviders`, `provider`, `maxTokens`, `effort` and `mode`, force `permissions.ask/deny` rules, and disable the guardian, web tools, MCP or the update check. Flags cannot override these. `hesdor doctor` shows whether managed settings are in effect.
+Administrators can place `managed-settings.json` in `%ProgramData%\hesdor\`, `/Library/Application Support/hesdor/` or `/etc/hesdor/` (or point `HESDOR_MANAGED_SETTINGS` at it) to lock `allowedProviders`, `provider`, `maxTokens`, `effort` and `mode`, force `permissions.ask/deny` rules, set a minimum `sandbox` that user and project settings cannot loosen, and disable the guardian, web tools, MCP or the update check. Flags cannot override these. `hesdor doctor` shows whether managed settings are in effect.
 
 ## Project context
 
