@@ -161,6 +161,14 @@ Headless runs print the answer on stdout and activity on stderr:
 
 Each preset reads its own key variable, or save keys once with `hesdor setup`. Keys are never stored inside a repository. Full list, custom endpoints and proxies: [docs/providers.md](docs/providers.md). Which subscriptions work and why some do not: [docs/subscriptions.md](docs/subscriptions.md).
 
+## Don't want to pick models?
+
+```bash
+hesdor --profile economy run "fix the failing tests"
+```
+
+`economy` does the work with strong cheap models (DeepSeek, GLM, Qwen, MiniMax), keeps a frontier model as an on-demand oracle, and escalates to a stronger model only when the run gets stuck. `balanced` and `frontier` trade more cost for more quality. Hesdor picks from the keys you already have and shows what it chose in `hesdor doctor`. The rankings are a starting point that the [benchmarks](docs/benchmarks.md) will tune. [Profiles](docs/roles.md)
+
 ## How it compares
 
 A summary from our notes on each project's documentation, as of Nov 2026. Corrections are welcome.
