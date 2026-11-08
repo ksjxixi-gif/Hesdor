@@ -70,6 +70,7 @@ describe('upgrade command', () => {
   it('detects the install method from the script path', () => {
     expect(detectInstall('C:\\Users\\me\\AppData\\Roaming\\npm\\node_modules\\@dean_overlord\\hesdor\\bin\\hesdor.js')).toBe('npm')
     expect(detectInstall('/usr/local/lib/node_modules/@dean_overlord/hesdor/bin/hesdor.js')).toBe('npm')
+    expect(detectInstall('C:/tools/hesdor.exe', true)).toBe('binary')
     expect(detectInstall('/home/me/.local/share/pnpm/global/5/.pnpm/@dean_overlord+hesdor@0.1.0/node_modules/@dean_overlord/hesdor/bin/hesdor.js')).toBe('pnpm')
     expect(detectInstall('/home/me/.npm/_npx/1a2b3c/node_modules/@dean_overlord/hesdor/bin/hesdor.js')).toBe('npx')
     expect(detectInstall('/src/Hesdor/packages/cli/bin/hesdor.js')).toBe('source')
