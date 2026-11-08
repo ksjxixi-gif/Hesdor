@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { z } from 'zod'
 import { checksFor, stripAnsi, type TestKind, type TestRunner } from '../checks.js'
@@ -238,10 +239,20 @@ export const runTestsTool = defineTool({
     const failures = passed ? [] : parseFailures(runner.kind, lines)
     const text = lines.filter((l) => l.trim() !== '')
     // Strip the root only as a prefix; runners may report its real path (macOS: /var -> /private/var).
-    const roots = [...new Set([ctx.root, realPathOf(ctx.root)])].map((r) => `${r.replace(/\\/g, '/')}/`)
+    // Node's own realpath keeps Windows 8.3 short names (C:\Users\RUNNER~1) while the native one expands them,
+    // so accept both, compared case-insensitively on Windows.
+    const fold = (s: string): string => (process.platform === 'win32' ? s.toLowerCase() : s)
+    const jsReal = (p: string): string => {
+      try {
+        return realpathSync(p)
+      } catch {
+        return p
+      }
+    }
+    const roots = [...new Set([ctx.root, realPathOf(ctx.root), jsReal(ctx.root)])].map((r) => fold(`${r.replace(/\\/g, '/')}/`))
     const relLoc = (loc: string): string => {
       const l = loc.replace(/\\/g, '/')
-      const r = roots.find((p) => l.startsWith(p))
+      const r = roots.find((p) => fold(l).startsWith(p))
       return r ? l.slice(r.length) : l
     }
     return {
