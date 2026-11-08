@@ -45,6 +45,8 @@ export interface ToolContext {
   approvalsEnabled: boolean
   /** allow/ask/deny rules. When set, unknown commands ask by default (if approvalsEnabled); see decideCommand. */
   permissions?: import('./policy.js').PermissionPolicy
+  /** OS sandbox for run_command and background jobs (sandbox.ts); off when absent. */
+  sandbox?: import('./sandbox.js').SandboxConfig
   /** Optional nested agent hook powering the explore tool, and the task tool when `agent` is given. */
   subagent?: (task: string, maxSteps?: number, agent?: SubagentSpec) => Promise<string>
   /**
@@ -54,6 +56,8 @@ export interface ToolContext {
   reviewChange?: (req: { path: string; before: string | null; after: string | null }) => Promise<boolean>
   /** The model accepts images (catalog): read_file then returns png/jpeg/gif/webp files as images. */
   imageInput?: boolean
+  /** Post-edit format/lint/typecheck and the run_tests command (checks.ts); detected when absent. */
+  checks?: import('./checks.js').ChecksConfig
   state: {
     activeChild: ChildProcess | null
     snapshots: FileSnapshot[]
@@ -65,6 +69,10 @@ export interface ToolContext {
     fileStamps?: Map<string, string>
     /** Set once web or MCP output (any NETWORK tool) entered the conversation; approvals then say so. */
     tainted?: boolean
+    /** Consecutive failed V4A patches per file; the second one tells the model to use write_file. */
+    patchFailures?: Map<string, number>
+    /** Post-edit check output last seen per check (and file), and checks switched off for being too slow. */
+    checks?: { baselines: Map<string, string[]>; off: Set<string> }
   }
 }
 
