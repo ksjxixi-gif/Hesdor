@@ -31,6 +31,10 @@ jobs:
             exit 1
           fi
 
+      # Same sandbox setup as ci.yml: the sandbox tests fail loudly on Linux CI without bubblewrap.
+      - run: |
+          sudo apt-get update -q && sudo apt-get install -y bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
