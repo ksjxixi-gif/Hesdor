@@ -52,6 +52,8 @@ export interface McpCallResult {
   isError: boolean
 }
 
+declare const __HESDOR_VERSION__: string | undefined
+
 const DEFAULT_TIMEOUT_MS = 10_000
 const TOOL_CALL_TIMEOUT_MS = 120_000
 // A legacy stdio server that silently ignores the server/discover probe costs this much startup time.
@@ -207,7 +209,8 @@ export class McpClient {
       ? new sdk.StreamableHTTPClientTransport(new URL(url), { requestInit: { headers }, ...(this.oauth ? { authProvider: this.oauth } : {}) })
       : new StdioTransport({ ...this.config, command: command! })
     const client = new sdk.Client(
-      { name: 'hesdor', version: '0.1.0' },
+      // Replaced by the CLI bundlers (same define as the CLI's VERSION); absent in tests and tsc builds.
+      { name: 'hesdor', version: typeof __HESDOR_VERSION__ === 'string' ? __HESDOR_VERSION__ : '0.0.0-dev' },
       {
         // Form mode only: URL mode needs a consent UI that shows the full URL first.
         capabilities: { elicitation: { form: {} } },
