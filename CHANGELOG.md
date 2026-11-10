@@ -7,12 +7,25 @@ the published CLI package (`packages/cli`).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-10
+
+This release rebuilds most of Hesdor. Highlights:
+
+- **Safer by default.** A cloned repository can no longer run its plugins, hooks or MCP servers until you approve them; commands Hesdor cannot inspect ask first; permission rules, turn checkpoints with `/rewind`, and an optional OS sandbox on Linux and macOS.
+- **Works with current models.** Reasoning state is replayed, the OpenAI Responses API is supported, prompts are cached, failures are retried, and long sessions compact themselves. 44 provider presets, checked weekly.
+- **Any model, mixed on purpose.** `--profile economy|balanced|frontier` picks models from the keys you have, with a cheap helper model, an oracle from another vendor, fallbacks and escalation when a run is stuck. Every request is priced, and `--max-budget-usd` caps a run.
+- **Use your ChatGPT plan** through OpenAI's official program: `hesdor login chatgpt`.
+- **More ways to run it:** scriptable headless output, `hesdor review` with a GitHub Action, goal mode, editors through `hesdor acp`, MCP with OAuth, hooks and markdown subagents.
+- **Faster and lighter:** startup in about 80 ms, and standalone binaries that need no Node.js.
+
+Upgrading from 0.1.0: in the TUI, commands outside a small safe list now ask before running, and "always allow" is Shift+A. The `openai` preset now uses the Responses API with `gpt-6.1-sol`. The saved default model is now per provider. The `perplexity` preset and the `stop_command` tool are gone. Tool results are plain text, which matters if a plugin parses them.
+
 ### Security
 
 - **Optional OS sandbox:** `sandbox: { mode: "workspace-write" | "read-only", network: "off" | "on", failIfUnavailable }` runs `run_command`, background jobs, checks and `run_tests` under bubblewrap (Linux) or Seatbelt (macOS). Writes are limited to the workspace and a temp dir with `.git/hooks` and `.git/config` read-only, the network is off unless allowed, and failures name the sandbox rule that blocked them. Inside the sandbox, commands no rule covers run without a prompt; deny rules and risky-command asks still apply. A project can only make it stricter and managed settings can set a minimum. Off by default; Windows is not supported yet, and `network: "allowlist"` is accepted but keeps the network fully off until domain filtering lands.
 - Post-edit checks never run tools a repository commits under `node_modules/.bin`.
 - `hesdor policy check` labels managed-settings rules as `managed` and shows the file they come from.
-- `.hesdor/config.json` is part of the workspace trust fingerprint and can only set mode, maxTokens, effort and model. Managed settings can lock providers, force deny rules and disable the guardian, web tools, MCP and the update check.
+- `.hesdor/config.json` is part of the workspace trust fingerprint and can only set mode, maxTokens, effort, model and `checks`, and can only tighten `sandbox`. Managed settings can lock providers, force deny rules and disable the guardian, web tools, MCP and the update check.
 - ChatGPT sign-in tokens never leave api.openai.com: other base URLs are refused, redirects are not followed with a token, and the ID token is validated (signature, issuer, audience, nonce).
 - `web_fetch` refuses loopback, private, CGNAT, link-local, cloud-metadata, multicast and reserved addresses (IPv4, IPv6 and IPv4-mapped), re-checks DNS on every redirect and connects only to the checked address, and strips zero-width, bidi and Unicode tag characters. After web or MCP output, approval prompts say "after reading web/MCP content".
 - MCP tool annotations set a tool's risk only for servers in your own `mcp.json`; a repository's servers stay network-risk. MCP OAuth tokens are stored per server URL with mode 0600 and never sent to another origin.
@@ -127,7 +140,7 @@ the published CLI package (`packages/cli`).
 - **New presets:** moonshot, kimi-code, zai, qwen, minimax, stepfun, vercel, requesty, nebius, novita, baseten, chutes, bedrock, azure-claude, azure-openai, and local litellm, llamacpp, vllm and jan.
 - **Proxy support:** `HTTPS_PROXY`/`HTTP_PROXY` are honored on Node 24.14+ (Node 22.21+ needs `NODE_USE_ENV_PROXY=1`); `NODE_EXTRA_CA_CERTS` and `NODE_USE_SYSTEM_CA` are documented and shown by `hesdor doctor`.
 - **`hesdor auth list`** and **`hesdor auth logout <provider>`**.
-- **Headless scripting:** `--output-format text|json|stream-json` (stream-json emits an init event, every run event and a result; json emits one result object), prompt from stdin (`-` or piped input), `-o/--output <file>`, and documented exit codes: 0 completed, 1 failed, 2 max steps, 3 provider error, 130 cancelled.
+- **Headless scripting:** `--output-format text|json|stream-json` (stream-json emits an init event, every run event and a result; json emits one result object), prompt from stdin (`-` or piped input), `-o/--output <file>`, and documented exit codes: 0 completed, 1 failed, 2 max steps, 3 provider error, 4 cost budget reached, 5 review findings, 6 goal not met, 130 cancelled.
 - **Sessions:** headless runs are saved too; `-c/--continue` resumes the latest session and `-r/--resume <id>` a specific one (unique prefixes work), in both headless and interactive mode. `/clear` and `/compact` start a new session linked to the previous one instead of overwriting it, and a per-repository index makes the session list fast.
 - **Runs outside a Git repository:** the current directory becomes the workspace and git features are skipped. The home directory, a filesystem root or a dotfiles repository at `~/.git` is refused unless `--allow-home` is passed.
 - **Background jobs:** `run_command` with `background: true` starts dev servers and watchers; `job_output`, `job_list` and `job_stop` read and stop them, and every job's process tree is killed when Hesdor exits. `stop_command` is removed.
@@ -143,7 +156,7 @@ the published CLI package (`packages/cli`).
 - Release workflow that publishes the CLI to npm through trusted publishing with provenance.
 - MIT `LICENSE` file, also shipped in the npm package.
 - `hesdor --version` reports the version from `packages/cli/package.json`, injected at build time.
-- The npm tarball now contains only `bin/`, `dist/bundle.js`, `LICENSE` and `README.md`, and `prepack` builds every workspace package first.
+- The npm tarball now contains only `bin/`, `dist/bundle.js`, `dist/chunks/`, `LICENSE` and `README.md`, and `prepack` builds every workspace package first.
 
 ## [0.1.0] - 2026-08-24
 
@@ -156,5 +169,6 @@ First public release of the Hesdor CLI (`@dean_overlord/hesdor`).
 - Project context from `HESDOR.md`, `.hesdorignore` and repository metadata.
 - Extensions: custom slash commands, skills, plugins and MCP servers.
 
-[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/9a4221a...HEAD
+[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ksjxixi-gif/Hesdor/releases/tag/v0.2.0
 [0.1.0]: https://www.npmjs.com/package/@dean_overlord/hesdor/v/0.1.0
