@@ -9,7 +9,7 @@
 <text x="16.0" y="64" fill="#ef6b6b" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
 <text x="16.0" y="83" fill="#ef6b6b" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="83" fill="#5cc8c8" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">◆ hesdor</text>
-<text x="108.4" y="83" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">v0.1.0</text>
+<text x="108.4" y="83" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">v0.2.0</text>
 <text x="595.6" y="83" fill-opacity="0.6" textLength="100.8" lengthAdjust="spacingAndGlyphs">slugs:main ·</text>
 <text x="704.8" y="83" fill="#8cc97a" fill-opacity="0.6" textLength="42.0" lengthAdjust="spacingAndGlyphs">build</text>
 <text x="755.2" y="83" fill-opacity="0.6" textLength="252.0" lengthAdjust="spacingAndGlyphs">· openai-compatible/demo-model</text>
@@ -19,7 +19,7 @@
 <text x="772.0" y="121" fill="#5c6370" textLength="252.0" lengthAdjust="spacingAndGlyphs">╭────────────────────────────╮</text>
 <text x="16.0" y="140" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="140" fill="#5cc8c8" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">ACTIVITY</text>
-<text x="679.6" y="140" fill-opacity="0.6" textLength="75.6" lengthAdjust="spacingAndGlyphs">⠇ working</text>
+<text x="679.6" y="140" fill-opacity="0.6" textLength="75.6" lengthAdjust="spacingAndGlyphs">⠼ working</text>
 <text x="763.6" y="140" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="772.0" y="140" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="788.8" y="140" fill="#5cc8c8" font-weight="bold" textLength="58.8" lengthAdjust="spacingAndGlyphs">SESSION</text>
@@ -29,7 +29,7 @@
 <text x="763.6" y="159" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="772.0" y="159" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="788.8" y="159" fill-opacity="0.6" textLength="58.8" lengthAdjust="spacingAndGlyphs">session</text>
-<text x="881.2" y="159" textLength="84.0" lengthAdjust="spacingAndGlyphs">mw5cn7m6-f</text>
+<text x="881.2" y="159" textLength="84.0" lengthAdjust="spacingAndGlyphs">mwb2rbsu-m</text>
 <text x="1015.6" y="159" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="178" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="178" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
@@ -81,7 +81,7 @@
 <text x="763.6" y="311" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="772.0" y="311" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="788.8" y="311" fill-opacity="0.6" textLength="42.0" lengthAdjust="spacingAndGlyphs">tools</text>
-<text x="881.2" y="311" textLength="16.8" lengthAdjust="spacingAndGlyphs">20</text>
+<text x="881.2" y="311" textLength="16.8" lengthAdjust="spacingAndGlyphs">22</text>
 <text x="1015.6" y="311" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="330" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="763.6" y="330" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
@@ -131,7 +131,7 @@
 <text x="16.0" y="558" fill="#ef6b6b" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</text>
 <text x="16.0" y="577" fill="#5c6370" textLength="1008.0" lengthAdjust="spacingAndGlyphs">┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐</text>
 <text x="16.0" y="596" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="596" fill="#8cc97a" textLength="58.8" lengthAdjust="spacingAndGlyphs">⠇ build</text>
+<text x="32.8" y="596" fill="#8cc97a" textLength="58.8" lengthAdjust="spacingAndGlyphs">⠼ build</text>
 <text x="100.0" y="596" fill-opacity="0.6" textLength="428.4" lengthAdjust="spacingAndGlyphs">· openai-compatible/demo-model · esc cancel · local</text>
 <text x="847.6" y="596" fill-opacity="0.6" textLength="159.6" lengthAdjust="spacingAndGlyphs">/help · ctrl+c exit</text>
 <text x="1015.6" y="596" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
