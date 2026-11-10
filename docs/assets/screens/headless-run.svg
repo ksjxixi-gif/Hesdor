@@ -23,8 +23,8 @@
 <text x="32.8" y="216" fill-opacity="0.6" textLength="168.0" lengthAdjust="spacingAndGlyphs">│ &gt; slugs@1.0.0 test</text>
 <text x="32.8" y="235" fill-opacity="0.6" textLength="302.4" lengthAdjust="spacingAndGlyphs">│ &gt; node --test --test-reporter=spec</text>
 <text x="32.8" y="254" fill-opacity="0.6" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="273" fill-opacity="0.6" textLength="210.0" lengthAdjust="spacingAndGlyphs">│ ✔ lowercases (1.2644ms)</text>
-<text x="32.8" y="292" fill-opacity="0.6" textLength="361.2" lengthAdjust="spacingAndGlyphs">│ ✔ joins every word with a dash (0.2423ms)</text>
+<text x="32.8" y="273" fill-opacity="0.6" textLength="210.0" lengthAdjust="spacingAndGlyphs">│ ✔ lowercases (0.9034ms)</text>
+<text x="32.8" y="292" fill-opacity="0.6" textLength="352.8" lengthAdjust="spacingAndGlyphs">│ ✔ joins every word with a dash (0.212ms)</text>
 <text x="32.8" y="311" fill-opacity="0.6" textLength="92.4" lengthAdjust="spacingAndGlyphs">│ ℹ tests 2</text>
 <text x="32.8" y="330" fill-opacity="0.6" textLength="100.8" lengthAdjust="spacingAndGlyphs">│ ℹ suites 0</text>
 <text x="32.8" y="349" fill-opacity="0.6" textLength="84.0" lengthAdjust="spacingAndGlyphs">│ ℹ pass 2</text>
@@ -32,7 +32,7 @@
 <text x="32.8" y="387" fill-opacity="0.6" textLength="126.0" lengthAdjust="spacingAndGlyphs">│ ℹ cancelled 0</text>
 <text x="32.8" y="406" fill-opacity="0.6" textLength="109.2" lengthAdjust="spacingAndGlyphs">│ ℹ skipped 0</text>
 <text x="32.8" y="425" fill-opacity="0.6" textLength="84.0" lengthAdjust="spacingAndGlyphs">│ ℹ todo 0</text>
-<text x="32.8" y="444" fill-opacity="0.6" textLength="201.6" lengthAdjust="spacingAndGlyphs">│ ℹ duration_ms 157.9235</text>
+<text x="32.8" y="444" fill-opacity="0.6" textLength="201.6" lengthAdjust="spacingAndGlyphs">│ ℹ duration_ms 108.5535</text>
 <text x="16.0" y="463" textLength="806.4" lengthAdjust="spacingAndGlyphs">Fixed `slugify` in `src/slug.js`: it replaced only the first space. It now replaces every run of</text>
 <text x="24.4" y="482" textLength="352.8" lengthAdjust="spacingAndGlyphs">whitespace with one dash. Both tests pass.</text>
 </g>
