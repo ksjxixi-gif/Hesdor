@@ -9,7 +9,7 @@
 <text x="16.0" y="64" fill="#5cc8c8" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
 <text x="16.0" y="83" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="83" fill="#5cc8c8" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">◆ hesdor</text>
-<text x="108.4" y="83" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">v0.1.0</text>
+<text x="108.4" y="83" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">v0.2.0</text>
 <text x="595.6" y="83" fill-opacity="0.6" textLength="100.8" lengthAdjust="spacingAndGlyphs">slugs:main ·</text>
 <text x="704.8" y="83" fill="#8cc97a" fill-opacity="0.6" textLength="42.0" lengthAdjust="spacingAndGlyphs">build</text>
 <text x="755.2" y="83" fill-opacity="0.6" textLength="252.0" lengthAdjust="spacingAndGlyphs">· openai-compatible/demo-model</text>
@@ -78,11 +78,11 @@
 <text x="1015.6" y="482" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="501" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="501" fill="#5cc8c8" font-weight="bold" textLength="520.8" lengthAdjust="spacingAndGlyphs">› node --test passes Goal: keep working until this holds: node</text>
-<text x="562.0" y="501" fill-opacity="0.6" textLength="176.4" lengthAdjust="spacingAndGlyphs">10:10:21 PM · turn 10</text>
+<text x="562.0" y="501" fill-opacity="0.6" textLength="176.4" lengthAdjust="spacingAndGlyphs">10:20:12 PM · turn 10</text>
 <text x="1015.6" y="501" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="520" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="41.2" y="520" textLength="310.8" lengthAdjust="spacingAndGlyphs">Fix the slugify bug and run the tests</text>
-<text x="360.4" y="520" fill-opacity="0.6" textLength="168.0" lengthAdjust="spacingAndGlyphs">10:10:15 PM · turn 0</text>
+<text x="360.4" y="520" fill-opacity="0.6" textLength="168.0" lengthAdjust="spacingAndGlyphs">10:20:08 PM · turn 0</text>
 <text x="1015.6" y="520" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="539" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="539" fill-opacity="0.6" textLength="336.0" lengthAdjust="spacingAndGlyphs">[↑↓] move · [enter] select · [esc] close</text>
