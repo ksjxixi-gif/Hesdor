@@ -50,8 +50,16 @@ jobs:
           test "$(node packages/cli/bin/hesdor.js --version)" = "hesdor ${GITHUB_REF_NAME#v}"
           node packages/cli/bin/hesdor.js --help > /dev/null
 
+      # What npm compares with the trusted publisher saved on npmjs.com. These claims are identifiers, not secrets.
+      - name: Show the identity GitHub presents to npm
+        run: |
+          curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" |
+            node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const c=JSON.parse(Buffer.from(JSON.parse(s).value.split('.')[1],'base64url'));for(const k of ['repository','repository_owner','workflow_ref','environment','ref','runner_environment'])console.log(k+': '+(c[k]??'(none)'))})"
+
+      # verbose: npm only logs why the trusted-publishing exchange failed at this level; without it a
+      # failed exchange shows up as a bare 404 on the upload.
       - name: Publish to npm
-        run: npm publish "$RUNNER_TEMP"/*.tgz --access public
+        run: npm publish "$RUNNER_TEMP"/*.tgz --access public --loglevel verbose
 
       - name: Create the GitHub release
         env:
