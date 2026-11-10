@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="838" height="313" viewBox="0 0 838.4 313" role="img" aria-label="hesdor doctor">
+<svg xmlns="http://www.w3.org/2000/svg" width="838" height="389" viewBox="0 0 838.4 389" role="img" aria-label="hesdor doctor">
 <style>text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"DejaVu Sans Mono","Liberation Mono",monospace;font-size:14px;white-space:pre}</style>
-<rect x="0.5" y="0.5" width="837.4" height="312" rx="10" fill="#0f1115" stroke="#2a2f38"/>
+<rect x="0.5" y="0.5" width="837.4" height="388" rx="10" fill="#0f1115" stroke="#2a2f38"/>
 <path d="M0.5 34V10.5a10 10 0 0 1 10-10H827.9a10 10 0 0 1 10 10V34Z" fill="#191c22"/>
 <line x1="0.5" y1="34" x2="837.9" y2="34" stroke="#2a2f38"/>
 <circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
@@ -18,7 +18,11 @@
 <text x="16.0" y="197" textLength="394.8" lengthAdjust="spacingAndGlyphs">✓ API credential local provider — no key needed</text>
 <text x="16.0" y="216" textLength="529.2" lengthAdjust="spacingAndGlyphs">✓ Telemetry      none — Hesdor collects and sends no usage data</text>
 <text x="16.0" y="235" textLength="378.0" lengthAdjust="spacingAndGlyphs">✓ Update check   off (HESDOR_NO_UPDATE_CHECK)</text>
-<text x="16.0" y="254" textLength="420.0" lengthAdjust="spacingAndGlyphs">✓ Extensions     0 commands · 0 skills · 0 plugins</text>
-<text x="16.0" y="292" textLength="336.0" lengthAdjust="spacingAndGlyphs">1 issue(s) found. Fix the ✗ items above.</text>
+<text x="16.0" y="254" textLength="428.4" lengthAdjust="spacingAndGlyphs">✓ Sandbox        off · not supported on Windows yet</text>
+<text x="16.0" y="273" textLength="798.0" lengthAdjust="spacingAndGlyphs">✓ Edit checks    none (set checks in config.json, or install prettier, eslint, oxlint, biome or</text>
+<text x="16.0" y="292" textLength="193.2" lengthAdjust="spacingAndGlyphs">typescript in the repo)</text>
+<text x="16.0" y="311" textLength="730.8" lengthAdjust="spacingAndGlyphs">✓ Test runner    npm test (package.json test script (node --test --test-reporter=spec))</text>
+<text x="16.0" y="330" textLength="420.0" lengthAdjust="spacingAndGlyphs">✓ Extensions     0 commands · 0 skills · 0 plugins</text>
+<text x="16.0" y="368" textLength="336.0" lengthAdjust="spacingAndGlyphs">1 issue(s) found. Fix the ✗ items above.</text>
 </g>
 </svg>
