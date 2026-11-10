@@ -9,7 +9,7 @@
 <text x="16.0" y="64" fill="#8cc97a" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮</text>
 <text x="16.0" y="83" fill="#8cc97a" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="83" fill="#5cc8c8" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">◆ hesdor</text>
-<text x="108.4" y="83" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">v0.1.0</text>
+<text x="108.4" y="83" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">v0.2.0</text>
 <text x="595.6" y="83" fill-opacity="0.6" textLength="100.8" lengthAdjust="spacingAndGlyphs">slugs:main ·</text>
 <text x="704.8" y="83" fill="#8cc97a" fill-opacity="0.6" textLength="42.0" lengthAdjust="spacingAndGlyphs">build</text>
 <text x="755.2" y="83" fill-opacity="0.6" textLength="252.0" lengthAdjust="spacingAndGlyphs">· openai-compatible/demo-model</text>
@@ -18,90 +18,90 @@
 <text x="16.0" y="121" fill="#5c6370" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╭────────────────────────────────────────────────────────────────────────────────────────╮╭────────────────────────────╮</text>
 <text x="16.0" y="140" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="32.8" y="140" fill="#5cc8c8" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">ACTIVITY</text>
-<text x="679.6" y="140" fill-opacity="0.6" textLength="75.6" lengthAdjust="spacingAndGlyphs">14 events</text>
+<text x="679.6" y="140" fill-opacity="0.6" textLength="75.6" lengthAdjust="spacingAndGlyphs">17 events</text>
 <text x="763.6" y="140" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="140" fill="#5cc8c8" font-weight="bold" textLength="58.8" lengthAdjust="spacingAndGlyphs">SESSION</text>
 <text x="1015.6" y="140" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="159" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="159" fill-opacity="0.6" textLength="285.6" lengthAdjust="spacingAndGlyphs">··· ↑ 3 earlier lines (↑/pgup) ···</text>
+<text x="32.8" y="159" fill-opacity="0.6" textLength="285.6" lengthAdjust="spacingAndGlyphs">··· ↑ 6 earlier lines (↑/pgup) ···</text>
 <text x="763.6" y="159" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="159" fill-opacity="0.6" textLength="58.8" lengthAdjust="spacingAndGlyphs">session</text>
-<text x="881.2" y="159" textLength="84.0" lengthAdjust="spacingAndGlyphs">mw5cn7m6-f</text>
+<text x="881.2" y="159" textLength="84.0" lengthAdjust="spacingAndGlyphs">mwb2rbsu-m</text>
 <text x="1015.6" y="159" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="178" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="178" fill="#8cc97a" fill-opacity="0.6" textLength="159.6" lengthAdjust="spacingAndGlyphs">✓ Searching slugify</text>
 <text x="763.6" y="178" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="178" fill-opacity="0.6" textLength="67.2" lengthAdjust="spacingAndGlyphs">messages</text>
-<text x="881.2" y="178" textLength="16.8" lengthAdjust="spacingAndGlyphs">12</text>
+<text x="881.2" y="178" textLength="16.8" lengthAdjust="spacingAndGlyphs">14</text>
 <text x="1015.6" y="178" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="197" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="197" fill="#8cc97a" fill-opacity="0.6" textLength="176.4" lengthAdjust="spacingAndGlyphs">✓ Reading src/slug.js</text>
+<text x="32.8" y="197" fill="#8cc97a" fill-opacity="0.6" textLength="176.4" lengthAdjust="spacingAndGlyphs">✓ patched src/slug.js</text>
 <text x="763.6" y="197" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="197" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">tokens</text>
-<text x="881.2" y="197" textLength="42.0" lengthAdjust="spacingAndGlyphs">19560</text>
+<text x="881.2" y="197" textLength="42.0" lengthAdjust="spacingAndGlyphs">24220</text>
 <text x="1015.6" y="197" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="216" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="216" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
-<text x="49.6" y="216" textLength="680.4" lengthAdjust="spacingAndGlyphs">`replace` with a string pattern only swaps the first space. Switching to a regex.</text>
+<text x="32.8" y="216" fill="#8cc97a" fill-opacity="0.6" textLength="176.4" lengthAdjust="spacingAndGlyphs">✓ Running node --test</text>
 <text x="763.6" y="216" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="216" fill-opacity="0.6" textLength="84.0" lengthAdjust="spacingAndGlyphs">undo depth</text>
 <text x="881.2" y="216" textLength="8.4" lengthAdjust="spacingAndGlyphs">1</text>
 <text x="1015.6" y="216" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="235" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="32.8" y="235" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
+<text x="49.6" y="235" textLength="697.2" lengthAdjust="spacingAndGlyphs">Fixed `slugify` in `src/slug.js`: it replaced only the first space. It now replaces</text>
 <text x="763.6" y="235" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1015.6" y="235" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="254" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="254" fill="#8cc97a" fill-opacity="0.6" textLength="176.4" lengthAdjust="spacingAndGlyphs">✓ patched src/slug.js</text>
+<text x="49.6" y="254" textLength="462.0" lengthAdjust="spacingAndGlyphs">every run of whitespace with one dash. Both tests pass.</text>
 <text x="763.6" y="254" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="254" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">branch</text>
 <text x="881.2" y="254" textLength="33.6" lengthAdjust="spacingAndGlyphs">main</text>
 <text x="1015.6" y="254" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="273" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="273" fill="#8cc97a" fill-opacity="0.6" textLength="176.4" lengthAdjust="spacingAndGlyphs">✓ Running node --test</text>
+<text x="32.8" y="273" fill="#8cc97a" textLength="117.6" lengthAdjust="spacingAndGlyphs">done (5 steps)</text>
 <text x="763.6" y="273" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="273" fill-opacity="0.6" textLength="58.8" lengthAdjust="spacingAndGlyphs">changes</text>
 <text x="881.2" y="273" textLength="42.0" lengthAdjust="spacingAndGlyphs">clean</text>
 <text x="1015.6" y="273" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="292" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="292" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
-<text x="49.6" y="292" textLength="697.2" lengthAdjust="spacingAndGlyphs">Fixed `slugify` in `src/slug.js`: it replaced only the first space. It now replaces</text>
+<text x="32.8" y="292" fill="#5cc8c8" font-weight="bold" textLength="218.4" lengthAdjust="spacingAndGlyphs">❯ /goal node --test passes</text>
 <text x="763.6" y="292" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1015.6" y="292" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="311" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="49.6" y="311" textLength="462.0" lengthAdjust="spacingAndGlyphs">every run of whitespace with one dash. Both tests pass.</text>
+<text x="32.8" y="311" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
+<text x="49.6" y="311" textLength="327.6" lengthAdjust="spacingAndGlyphs">Ran the test suite: 2 passed, 0 failed.</text>
 <text x="763.6" y="311" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="311" fill-opacity="0.6" textLength="42.0" lengthAdjust="spacingAndGlyphs">tools</text>
-<text x="881.2" y="311" textLength="16.8" lengthAdjust="spacingAndGlyphs">20</text>
+<text x="881.2" y="311" textLength="16.8" lengthAdjust="spacingAndGlyphs">22</text>
 <text x="1015.6" y="311" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="330" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="330" fill="#8cc97a" textLength="117.6" lengthAdjust="spacingAndGlyphs">done (5 steps)</text>
+<text x="32.8" y="330" fill="#8cc97a" textLength="109.2" lengthAdjust="spacingAndGlyphs">done (1 step)</text>
 <text x="763.6" y="330" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="330" fill-opacity="0.6" textLength="50.4" lengthAdjust="spacingAndGlyphs">skills</text>
 <text x="881.2" y="330" textLength="8.4" lengthAdjust="spacingAndGlyphs">0</text>
 <text x="1015.6" y="330" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="349" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="349" fill="#5cc8c8" font-weight="bold" textLength="218.4" lengthAdjust="spacingAndGlyphs">❯ /goal node --test passes</text>
+<text x="32.8" y="349" fill="#8cc97a" textLength="319.2" lengthAdjust="spacingAndGlyphs">goal check 1: met · node --test passes</text>
 <text x="763.6" y="349" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="349" fill-opacity="0.6" textLength="58.8" lengthAdjust="spacingAndGlyphs">plugins</text>
 <text x="881.2" y="349" textLength="8.4" lengthAdjust="spacingAndGlyphs">0</text>
 <text x="1015.6" y="349" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="368" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="368" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
-<text x="49.6" y="368" textLength="327.6" lengthAdjust="spacingAndGlyphs">Ran the test suite: 2 passed, 0 failed.</text>
+<text x="32.8" y="368" fill="#8cc97a" textLength="344.4" lengthAdjust="spacingAndGlyphs">goal met after 1 turn: node --test passes</text>
 <text x="763.6" y="368" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="788.8" y="368" fill-opacity="0.6" textLength="25.2" lengthAdjust="spacingAndGlyphs">mcp</text>
 <text x="881.2" y="368" textLength="33.6" lengthAdjust="spacingAndGlyphs">docs</text>
 <text x="1015.6" y="368" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="387" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="387" fill="#8cc97a" textLength="109.2" lengthAdjust="spacingAndGlyphs">done (1 step)</text>
+<text x="32.8" y="387" fill="#5cc8c8" font-weight="bold" textLength="226.8" lengthAdjust="spacingAndGlyphs">❯ Summarize the docs index.</text>
 <text x="763.6" y="387" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1015.6" y="387" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="406" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="406" fill="#8cc97a" textLength="319.2" lengthAdjust="spacingAndGlyphs">goal check 1: met · node --test passes</text>
+<text x="32.8" y="406" fill="#5cc8c8" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
+<text x="49.6" y="406" textLength="327.6" lengthAdjust="spacingAndGlyphs">Ran the test suite: 2 passed, 0 failed.</text>
 <text x="763.6" y="406" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1015.6" y="406" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="425" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
-<text x="32.8" y="425" fill="#8cc97a" textLength="344.4" lengthAdjust="spacingAndGlyphs">goal met after 1 turn: node --test passes</text>
+<text x="32.8" y="425" fill="#8cc97a" textLength="109.2" lengthAdjust="spacingAndGlyphs">done (1 step)</text>
 <text x="763.6" y="425" fill="#5c6370" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
 <text x="1015.6" y="425" fill="#5c6370" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
 <text x="16.0" y="444" fill="#5c6370" textLength="1008.0" lengthAdjust="spacingAndGlyphs">╰────────────────────────────────────────────────────────────────────────────────────────╯╰────────────────────────────╯</text>
