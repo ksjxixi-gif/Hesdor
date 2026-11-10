@@ -33,7 +33,7 @@ Requires Node.js 22 or newer.
 npm i -g @dean_overlord/hesdor
 ```
 
-Without Node.js, from the next release on: standalone binaries for Windows, Linux and macOS are attached to each GitHub release, and the install scripts verify their checksum.
+Without Node.js (0.2.0 and later): standalone binaries for Windows, Linux and macOS are attached to each GitHub release, and the install scripts verify their checksum.
 
 ```bash
 irm https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging/install.ps1 | iex     # Windows PowerShell
