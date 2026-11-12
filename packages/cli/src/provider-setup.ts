@@ -123,9 +123,11 @@ export function customEnvKey(providerId: string, oneOff: boolean): string {
 }
 
 /** Plans whose terms allow interactive use only (Qwen Coding Plan: https://www.alibabacloud.com/help/en/model-studio/coding-plan). */
+const QWEN_PLAN_REFUSAL =
+  'the Qwen Coding Plan is for interactive use only; its terms forbid automated scripts and other non-interactive use (https://www.alibabacloud.com/help/en/model-studio/coding-plan). Use `hesdor` interactively, or pick another provider (e.g. qwen with a pay-as-you-go key)'
 const INTERACTIVE_ONLY: Record<string, string> = {
-  'qwen-coding-plan':
-    'the Qwen Coding Plan is for interactive use only; its terms forbid automated scripts and other non-interactive use (https://www.alibabacloud.com/help/en/model-studio/coding-plan). Use `hesdor` interactively, or pick another provider (e.g. qwen with a pay-as-you-go key)',
+  'qwen-coding-plan': QWEN_PLAN_REFUSAL,
+  'qwen-coding-plan-cn': QWEN_PLAN_REFUSAL,
 }
 let headlessProcess = false
 /** Called by run/ask/plan/review (not acp: a person types each prompt there): from then on interactive-only plans are refused, including roles and subagents. */
