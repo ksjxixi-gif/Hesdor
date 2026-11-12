@@ -3,3 +3,6 @@ packages:
 
 allowBuilds:
   esbuild: true
+  # vsce only packages the VS Code extension locally: no keychain login or signing.
+  '@vscode/vsce-sign': false
+  keytar: false
