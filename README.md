@@ -18,7 +18,7 @@
 
 ## Why Hesdor
 
-- **Any model, any vendor.** 44 provider presets over three wire formats, any OpenAI- or Anthropic-compatible endpoint, local servers like Ollama, LM Studio, llama.cpp and vLLM, and your ChatGPT plan. Mix vendors with [model roles](docs/roles.md).
+- **Any model, any vendor.** 77 provider presets over three wire formats, any OpenAI- or Anthropic-compatible endpoint, local servers like Ollama, LM Studio, llama.cpp and vLLM, and your ChatGPT plan. Mix vendors with [model roles](docs/roles.md).
 - **You see what it costs.** Every request is priced from a bundled models.dev catalog, cache tokens included. The TUI shows session cost and cache hit rate, and `--max-budget-usd` stops a run at your limit.
 - **Local-first.** Tools run on your machine, not in a hosted sandbox. Sessions, checkpoints and keys stay in your config directory. Prompts go only to the provider you configure.
 - **No telemetry.** None. The only call home is an optional once-a-day version check, off in CI and headless runs.
@@ -176,7 +176,7 @@ A summary from our notes on each project's documentation, as of Nov 2026. Correc
 
 | | License | Models | OS-level sandbox | MCP | Subagents |
 |---|---|---|---|---|---|
-| **Hesdor** | MIT | 44 presets on 3 wire formats, custom endpoints, local servers | Optional: bubblewrap or Seatbelt, off by default, none on Windows yet | stdio and HTTP, OAuth | Read-only explore, markdown task agents |
+| **Hesdor** | MIT | 77 presets on 3 wire formats, custom endpoints, local servers | Optional: bubblewrap or Seatbelt, off by default, none on Windows yet | stdio and HTTP, OAuth | Read-only explore, markdown task agents |
 | Claude Code | Proprietary | Anthropic, also via Bedrock, Vertex, Foundry | Seatbelt or bubblewrap, off by default, none on native Windows | stdio, HTTP, SSE, WebSocket, OAuth | Markdown agents |
 | Codex CLI | Apache-2.0 | OpenAI Responses, Vertex, Bedrock, Ollama, LM Studio, custom | Seatbelt, bubblewrap and seccomp, Windows restricted token | stdio and HTTP, OAuth | TOML agents |
 | Gemini CLI | Apache-2.0 | Gemini API and Vertex (paid only since 2026-06-18) | Seatbelt, Docker or Podman, gVisor, LXC, Windows Low-IL | Yes | Preview |
