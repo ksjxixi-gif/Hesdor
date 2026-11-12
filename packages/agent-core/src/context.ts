@@ -54,6 +54,15 @@ export interface ToolContext {
    * before/after content (null = absent). Resolve false to reject the change.
    */
   reviewChange?: (req: { path: string; before: string | null; after: string | null }) => Promise<boolean>
+  /**
+   * Text file I/O through the host editor (ACP fs/read_text_file and fs/write_text_file): reads see unsaved
+   * buffers and writes land in the editor with undo. Paths are absolute and already safety-checked; binary
+   * files, stats, deletes and /undo stay on disk. Disk is used when absent.
+   */
+  editorFs?: {
+    readTextFile(abs: string): Promise<string>
+    writeTextFile(abs: string, content: string): Promise<void>
+  }
   /** The model accepts images (catalog): read_file then returns png/jpeg/gif/webp files as images. */
   imageInput?: boolean
   /** Post-edit format/lint/typecheck and the run_tests command (checks.ts); detected when absent. */
