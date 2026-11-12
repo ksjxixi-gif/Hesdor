@@ -70,7 +70,6 @@ export interface ParsedArgs {
     | 'init'
     | 'doctor'
     | 'setup'
-    | 'pricing'
     | 'model'
     | 'provider'
     | 'auth'
@@ -108,7 +107,6 @@ Setup:
   hesdor login chatgpt         Continue with ChatGPT: use your ChatGPT plan
                                (browser sign-in, no API key)
   hesdor logout chatgpt        Sign out of ChatGPT and revoke the session
-  hesdor pricing               Show Hesdor Cloud plans
   hesdor provider [<id>]       Show or set the default provider
   hesdor model [<id>]          Show or set the default model (per provider)
   hesdor auth list             Providers with a saved key (values hidden)
@@ -144,18 +142,10 @@ Setup:
                                days (--all: every workspace's checkpoints)
 
 Options:
-  -p, --provider <name>        Provider preset (openai, anthropic, openrouter,
-                               groq, deepseek, mistral, together, fireworks,
-                               hesdor, xai, opencode-zen, opencode-go, gemini,
-                               cerebras, sambanova, nvidia, huggingface,
-                               cohere, deepinfra, moonshot, kimi-code, zai,
-                               qwen, qwen-coding-plan, minimax, stepfun,
-                               vercel, requesty, chatgpt, nebius, novita,
-                               baseten, chutes, bedrock, azure-claude,
-                               azure-openai, ollama, lmstudio, litellm,
-                               llamacpp, vllm, jan, openai-compatible,
-                               anthropic-compatible, or any
-                               custom provider saved by \`hesdor setup\`
+  -p, --provider <name>        Provider preset id, e.g. openai, anthropic,
+                               openrouter, zai-coding-plan, ollama (all
+                               presets: \`hesdor setup\` or docs/providers.md),
+                               or a custom provider saved by \`hesdor setup\`
   -m, --model <model>          Model id for the provider
       --base-url <url>         Override the provider endpoint
       --effort <level>         Reasoning effort: low | medium | high
@@ -186,7 +176,7 @@ Environment:
   GOOGLE_GENERATIVE_AI_API_KEY), CEREBRAS_API_KEY, SAMBANOVA_API_KEY,
   NVIDIA_API_KEY, HF_TOKEN, COHERE_API_KEY, DEEPINFRA_TOKEN (or
   DEEPINFRA_API_KEY), OPENAI_COMPATIBLE_API_KEY, ANTHROPIC_COMPATIBLE_API_KEY,
-  HESDOR_API_KEY, HESDOR_BASE_URL, HESDOR_<PROVIDER_ID>_API_KEY for a custom
+  HESDOR_<PROVIDER_ID>_API_KEY for a custom
   provider (HESDOR_CUSTOM_API_KEY for one-off --base-url runs) — or save keys
   once with \`hesdor setup\`.
   Keys are never stored inside repositories.
@@ -263,7 +253,6 @@ export function parseArgs(argv: string[]): ParsedArgs {
       case 'init':
       case 'doctor':
       case 'setup':
-      case 'pricing':
       case 'model':
       case 'provider':
       case 'auth':
