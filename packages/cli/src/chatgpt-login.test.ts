@@ -156,10 +156,10 @@ describe('hesdor login chatgpt', () => {
 })
 
 describe('interactive-only plans', () => {
-  it('refuses the Qwen Coding Plan in headless mode, citing its terms', async () => {
+  it.each(['qwen-coding-plan', 'qwen-coding-plan-cn'])('refuses %s in headless mode, citing its terms', async (provider) => {
     process.env.ALIBABA_CODING_PLAN_API_KEY = 'sk-sp-test'
     const out = capture()
-    const flags: CliFlags = { yes: false, debug: false, force: false, version: false, help: false, provider: 'qwen-coding-plan' }
+    const flags: CliFlags = { yes: false, debug: false, force: false, version: false, help: false, provider }
     const code = await runHeadless('ask', 'hello', flags, { cwd: mkdtempSync(path.join(tmpdir(), 'hesdor-qwen-')) })
     delete process.env.ALIBABA_CODING_PLAN_API_KEY
     expect(code).toBe(1)
