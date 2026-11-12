@@ -37,9 +37,6 @@ async function main(): Promise<void> {
     case 'setup':
       process.exitCode = await (await setup()).runSetup()
       return
-    case 'pricing':
-      process.exitCode = (await import('./pricing.js')).runPricing()
-      return
     case 'model':
       process.exitCode = await (await setup()).runModelCommand(parsed.prompt, parsed.flags)
       return
