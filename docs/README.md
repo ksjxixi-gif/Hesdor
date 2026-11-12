@@ -4,7 +4,7 @@
 |---|---|
 | [interactive.md](interactive.md) | The TUI: slash commands, diff review, approvals, `/rewind`, `/goal`, `/mcp`, keys |
 | [headless.md](headless.md) | `run`, `plan`, `ask` in scripts and CI: output formats, exit codes, budgets, goal mode |
-| [providers.md](providers.md) | All 44 presets, models and effort, cost tracking, custom endpoints, proxies |
+| [providers.md](providers.md) | All 77 presets, models and effort, cost tracking, custom endpoints, proxies |
 | [subscriptions.md](subscriptions.md) | Which subscriptions work (ChatGPT plan, coding plans) and which do not |
 | [permissions.md](permissions.md) | Modes, command policy, permission rules, approvals, workspace trust, checkpoints |
 | [tools.md](tools.md) | Every tool the model can call, editing, web tools, images |
