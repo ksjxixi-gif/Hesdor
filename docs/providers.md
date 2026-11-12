@@ -1,6 +1,6 @@
 # Providers and models
 
-Hesdor speaks three wire formats: OpenAI Chat Completions, the OpenAI Responses API (stateless: `store: false`, encrypted reasoning replayed each turn) and the Anthropic Messages API. It ships 44 presets, and you can add any endpoint that speaks one of the three formats.
+Hesdor speaks three wire formats: OpenAI Chat Completions, the OpenAI Responses API (stateless: `store: false`, encrypted reasoning replayed each turn) and the Anthropic Messages API. It ships 77 presets, and you can add any endpoint that speaks one of the three formats.
 
 To use a subscription plan instead of an API key, see [subscriptions.md](subscriptions.md).
 
@@ -8,12 +8,13 @@ To use a subscription plan instead of an API key, see [subscriptions.md](subscri
 
 | Wire | Presets (key variable) |
 |---|---|
-| Responses | `openai` (`OPENAI_API_KEY`), `xai` (`XAI_API_KEY`), `azure-openai` (`AZURE_OPENAI_API_KEY`; base URL `https://<resource>.openai.azure.com/openai/v1` via setup or `AZURE_OPENAI_BASE_URL`; the model is your deployment name), `chatgpt` (your ChatGPT plan, see [subscriptions.md](subscriptions.md)) |
-| Anthropic | `anthropic` (`ANTHROPIC_API_KEY`), `minimax` (`MINIMAX_API_KEY`), `bedrock` (Bedrock API key in `AWS_BEARER_TOKEN_BEDROCK`; us-east-1 by default, other regions via `--base-url https://bedrock-runtime.<region>.amazonaws.com/anthropic`), `azure-claude` (Microsoft Foundry: `ANTHROPIC_FOUNDRY_API_KEY` and `ANTHROPIC_FOUNDRY_BASE_URL`), `anthropic-compatible` |
-| Chat Completions | `hesdor` (Hesdor Cloud) · `openrouter` · `groq` · `deepseek` · `mistral` · `together` · `fireworks` · `opencode-zen` · `opencode-go` · `gemini` · `cerebras` · `sambanova` · `nvidia` · `huggingface` · `cohere` · `deepinfra` · `moonshot` (`MOONSHOT_API_KEY`) · `kimi-code` (`KIMI_API_KEY`) · `zai` (`ZAI_API_KEY`) · `qwen` (`DASHSCOPE_API_KEY`) · `qwen-coding-plan` (`ALIBABA_CODING_PLAN_API_KEY`, interactive only) · `stepfun` (`STEP_API_KEY`) · `vercel` (`AI_GATEWAY_API_KEY`) · `requesty` · `nebius` · `novita` · `baseten` · `chutes` (each `<NAME>_API_KEY`) · `openai-compatible` |
+| Responses | `openai` (`OPENAI_API_KEY`), `xai` (`XAI_API_KEY`), `azure-openai` (`AZURE_OPENAI_API_KEY`; base URL `https://<resource>.openai.azure.com/openai/v1` via setup or `AZURE_OPENAI_BASE_URL`; the model is your deployment name), `chatgpt` (your ChatGPT plan, see [subscriptions.md](subscriptions.md)), `opencode-zen-responses` and `opencode-go-responses` (GPT models, `OPENCODE_API_KEY`), `meta` (`META_MODEL_API_KEY`) |
+| Anthropic | `anthropic` (`ANTHROPIC_API_KEY`), `minimax` and `minimax-cn` (`MINIMAX_API_KEY`, an API key or a Token Plan key), `opencode-zen-anthropic` and `opencode-go-anthropic` (`OPENCODE_API_KEY`), `bedrock` (Bedrock API key in `AWS_BEARER_TOKEN_BEDROCK`; us-east-1 by default, other regions via `--base-url https://bedrock-runtime.<region>.amazonaws.com/anthropic`), `azure-claude` (Microsoft Foundry: `ANTHROPIC_FOUNDRY_API_KEY` and `ANTHROPIC_FOUNDRY_BASE_URL`), `anthropic-compatible` |
+| Chat Completions | `openrouter` · `groq` · `deepseek` · `mistral` · `together` · `fireworks` · `opencode-zen` · `opencode-go` · `gemini` · `cerebras` · `sambanova` · `nvidia` · `huggingface` · `cohere` · `deepinfra` · `moonshot` and `moonshot-cn` (`MOONSHOT_API_KEY`) · `kimi-code` and `kimi-code-cn` (`KIMI_API_KEY`) · `zai` and `zai-coding-plan` (`ZAI_API_KEY`) · `zhipu` and `zhipu-coding-plan` (`ZHIPU_API_KEY`) · `qwen` and `qwen-cn` (`DASHSCOPE_API_KEY`) · `qwen-coding-plan` and `qwen-coding-plan-cn` (`ALIBABA_CODING_PLAN_API_KEY`, interactive only) · `stepfun` (`STEP_API_KEY`) · `vercel` (`AI_GATEWAY_API_KEY`) · `friendli` (`FRIENDLI_TOKEN`) · `digitalocean` (`DIGITALOCEAN_ACCESS_TOKEN`) · `volcengine` (`ARK_API_KEY`) · `siliconflow-cn` (`SILICONFLOW_CN_API_KEY`) · `requesty` · `nebius` · `novita` · `baseten` · `chutes` · `ollama-cloud` · `synthetic` · `kilo` · `zenmux` · `poe` · `siliconflow` · `wandb` · `vultr` · `scaleway` · `ovhcloud` · `xiaomi` · `longcat` · `inception` · `upstage` (each `<NAME>_API_KEY`) · `openai-compatible` |
+| Chat Completions, your account's URL | `cloudflare` (`CLOUDFLARE_API_KEY` or `CLOUDFLARE_API_TOKEN`; `CLOUDFLARE_WORKERS_AI_BASE_URL` = `https://api.cloudflare.com/client/v4/accounts/<account id>/ai/v1`) · `databricks` (`DATABRICKS_TOKEN`; `DATABRICKS_BASE_URL` = `https://<workspace host>/ai-gateway/mlflow/v1`) · `snowflake` (programmatic access token in `SNOWFLAKE_CORTEX_PAT`; `SNOWFLAKE_CORTEX_BASE_URL` = `https://<account>.snowflakecomputing.com/api/v2/cortex/v1`). `hesdor setup` asks for the URL when the variable is not set. |
 | Local, no key | `ollama` · `lmstudio` · `llamacpp` (`127.0.0.1:9931`, llama.cpp's default since v0.9; older builds use 8080) · `vllm` (start it with `--enable-auto-tool-choice --tool-call-parser <name>`) · `jan` · `litellm` (optional `LITELLM_API_KEY`) |
 
-Gemini also reads `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY`, and DeepInfra also reads `DEEPINFRA_API_KEY`. `hesdor --help` lists every key variable. `hesdor auth list` shows which providers have a saved key (never the value) and `hesdor auth logout <provider>` deletes one.
+Presets ending in `-cn` use the China-region endpoint and need a key from that region's console. Gemini also reads `GOOGLE_API_KEY` or `GOOGLE_GENERATIVE_AI_API_KEY`, and DeepInfra also reads `DEEPINFRA_API_KEY`. `hesdor --help` lists every key variable. `hesdor auth list` shows which providers have a saved key (never the value) and `hesdor auth logout <provider>` deletes one.
 
 A weekly workflow checks every preset's default model against models.dev.
 
@@ -79,12 +80,24 @@ A saved custom provider in `config.json` accepts a few optional fields:
 }
 ```
 
+Google Vertex AI has no preset because it authenticates with short-lived OAuth tokens, not a key. Save it as a custom provider that asks `gcloud` for a token (reused for about 50 minutes):
+
+```json
+{
+  "customProviders": {
+    "vertex": {
+      "kind": "openai",
+      "baseUrl": "https://aiplatform.googleapis.com/v1/projects/<project>/locations/global/endpoints/openapi",
+      "apiKeyCommand": ["gcloud", "auth", "print-access-token"]
+    }
+  }
+}
+```
+
+Then run `hesdor -p vertex -m google/<model id>`.
+
 `authHeader` sends the key as `Authorization: Bearer` instead of `x-api-key` (Anthropic wire). `apiKeyCommand` is an argv array run without a shell; its output is the key and is reused for about 50 minutes (on Windows, wrap batch files as `["cmd", "/c", "get-key.cmd"]`). `extraBody` is merged into every request. `includeUsage: false` stops asking a Chat Completions endpoint for token usage, for servers that reject `stream_options`.
 
 ## Proxies and corporate CAs
 
 Set `HTTPS_PROXY`/`HTTP_PROXY` (and `NO_PROXY`); Hesdor applies them on Node 24.14 or newer. On Node 22.21+ also set `NODE_USE_ENV_PROXY=1`. For a TLS-inspecting proxy, point `NODE_EXTRA_CA_CERTS` at your CA's PEM file or set `NODE_USE_SYSTEM_CA=1` (Node 22.19+) to trust the OS store. `hesdor doctor` reports whether the proxy is in effect.
-
-## Hesdor Cloud
-
-Hesdor Cloud pricing is available with `hesdor pricing`: Free ($0, hard limit), Starter ($5/month), Pro ($7/month), and Max ($10/month). Account billing and quota enforcement belong to the Hesdor API service, not the local CLI.
