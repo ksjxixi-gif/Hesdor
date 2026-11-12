@@ -36,7 +36,7 @@ PACKAGE = "@dean_overlord/hesdor"
 KEY_VARS = (
     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENROUTER_API_KEY", "GEMINI_API_KEY", "DEEPSEEK_API_KEY",
     "GROQ_API_KEY", "MISTRAL_API_KEY", "XAI_API_KEY", "TOGETHER_API_KEY", "FIREWORKS_API_KEY",
-    "CEREBRAS_API_KEY", "HESDOR_API_KEY", "HESDOR_BASE_URL",
+    "CEREBRAS_API_KEY",
 )
 
 # Hesdor error_category -> Harbor exception, so provider failures are recorded as infra errors
