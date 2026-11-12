@@ -127,6 +127,8 @@ export interface TurnOptions {
   requestApproval: ToolContext['requestApproval']
   approvalsEnabled: boolean
   reviewChange?: ToolContext['reviewChange']
+  /** Text file I/O through the editor (ACP client fs); disk when omitted. */
+  editorFs?: ToolContext['editorFs']
   state: ToolContext['state']
   maxSteps?: number
   /** Provider for a task agent's `model:` (see agentProviderFor). Omitted: agents use the session model. */
@@ -323,6 +325,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
     imageInput: info?.imageInput === true,
     ...(checks ? { checks } : {}),
     ...(reviewChange ? { reviewChange } : {}),
+    ...(opts.editorFs ? { editorFs: opts.editorFs } : {}),
     state: opts.state,
     // One runner for the read-only explore agent and task agents. Plugins and hooks see (and can deny) their
     // calls; the sub ctx has no `subagent`, so nesting stops at depth 1.
@@ -351,6 +354,7 @@ export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
           permissions,
           ...(sandbox ? { sandbox } : {}),
           ...(agent && reviewChange ? { reviewChange } : {}),
+          ...(opts.editorFs ? { editorFs: opts.editorFs } : {}),
           ...(agent && checks ? { checks } : {}),
           // Own jobs and read stamps (it must not drain the main agent's job output); a task agent
           // shares the undo stack so /undo reverts its edits.
