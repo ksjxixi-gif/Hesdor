@@ -83,7 +83,8 @@ Notes:
   `--ak max_budget_usd=2` caps each trial's cost (`--max-budget-usd`, exit 4, a task failure).
 - Keys: the adapter forwards common `*_API_KEY` variables from your shell; any other variable can be
   passed with `--ae NAME=value`.
-- Use `-i '<glob>'` / `-x '<name>'` to pick tasks, `--ak version=0.1.0` to pin the CLI version, and
+- Use `-i '<glob>'` / `-x '<name>'` to pick tasks, `--ak version=0.1.0` to pin the CLI version
+  (or `--ak tarball=<path to a pnpm pack of packages/cli>` to test an unreleased build), and
   `-r 2 --retry-include ApiRateLimitError` to retry rate-limited trials.
 - `harbor datasets list` shows the registry datasets (`terminal-bench@2.0`, Aider polyglot, SWE-bench
   variants); Terminal-Bench 2.1 and 4.0 are on Harbor Hub as `terminal-bench/terminal-bench-2-1` and
