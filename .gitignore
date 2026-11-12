@@ -8,3 +8,4 @@ evals/jobs/
 __pycache__/
 *.pyc
 evals/live/
+*.vsix
