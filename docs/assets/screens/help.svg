@@ -23,19 +23,19 @@
 <text x="32.8" y="330" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor login chatgpt         Continue with ChatGPT: use your ChatGPT plan</text>
 <text x="276.4" y="349" textLength="243.6" lengthAdjust="spacingAndGlyphs">(browser sign-in, no API key)</text>
 <text x="32.8" y="368" textLength="596.4" lengthAdjust="spacingAndGlyphs">hesdor logout chatgpt        Sign out of ChatGPT and revoke the session</text>
-<text x="32.8" y="387" textLength="436.8" lengthAdjust="spacingAndGlyphs">hesdor pricing               Show Hesdor Cloud plans</text>
-<text x="32.8" y="406" textLength="512.4" lengthAdjust="spacingAndGlyphs">hesdor provider [&lt;id&gt;]       Show or set the default provider</text>
-<text x="32.8" y="425" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor model [&lt;id&gt;]          Show or set the default model (per provider)</text>
-<text x="32.8" y="444" textLength="596.4" lengthAdjust="spacingAndGlyphs">hesdor auth list             Providers with a saved key (values hidden)</text>
-<text x="32.8" y="463" textLength="487.2" lengthAdjust="spacingAndGlyphs">hesdor auth logout &lt;id&gt;      Delete a provider&apos;s saved key</text>
-<text x="32.8" y="482" textLength="604.8" lengthAdjust="spacingAndGlyphs">hesdor init                  Create HESDOR.md and .hesdorignore starters</text>
-<text x="32.8" y="501" textLength="579.6" lengthAdjust="spacingAndGlyphs">hesdor doctor                Check environment, tools and credentials</text>
-<text x="32.8" y="520" textLength="638.4" lengthAdjust="spacingAndGlyphs">hesdor doctor --live         Also send a few tiny real requests per provider</text>
-<text x="276.4" y="539" textLength="386.4" lengthAdjust="spacingAndGlyphs">(shows the cost first; -p &lt;id&gt; for one, --yes)</text>
-<text x="32.8" y="558" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor policy check &lt;cmd...&gt; Show whether run_command would allow, ask or</text>
-<text x="276.4" y="577" textLength="319.2" lengthAdjust="spacingAndGlyphs">deny a command, and which rule decides</text>
-<text x="32.8" y="596" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor mcp list              MCP servers: scope, transport, status, login</text>
-<text x="32.8" y="615" textLength="403.2" lengthAdjust="spacingAndGlyphs">hesdor mcp add &lt;name&gt; &lt;command...&gt; | --url &lt;url&gt;</text>
-<text x="276.4" y="634" textLength="285.6" lengthAdjust="spacingAndGlyphs">Add a server to your user mcp.json</text>
+<text x="32.8" y="387" textLength="512.4" lengthAdjust="spacingAndGlyphs">hesdor provider [&lt;id&gt;]       Show or set the default provider</text>
+<text x="32.8" y="406" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor model [&lt;id&gt;]          Show or set the default model (per provider)</text>
+<text x="32.8" y="425" textLength="596.4" lengthAdjust="spacingAndGlyphs">hesdor auth list             Providers with a saved key (values hidden)</text>
+<text x="32.8" y="444" textLength="487.2" lengthAdjust="spacingAndGlyphs">hesdor auth logout &lt;id&gt;      Delete a provider&apos;s saved key</text>
+<text x="32.8" y="463" textLength="604.8" lengthAdjust="spacingAndGlyphs">hesdor init                  Create HESDOR.md and .hesdorignore starters</text>
+<text x="32.8" y="482" textLength="579.6" lengthAdjust="spacingAndGlyphs">hesdor doctor                Check environment, tools and credentials</text>
+<text x="32.8" y="501" textLength="638.4" lengthAdjust="spacingAndGlyphs">hesdor doctor --live         Also send a few tiny real requests per provider</text>
+<text x="276.4" y="520" textLength="386.4" lengthAdjust="spacingAndGlyphs">(shows the cost first; -p &lt;id&gt; for one, --yes)</text>
+<text x="32.8" y="539" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor policy check &lt;cmd...&gt; Show whether run_command would allow, ask or</text>
+<text x="276.4" y="558" textLength="319.2" lengthAdjust="spacingAndGlyphs">deny a command, and which rule decides</text>
+<text x="32.8" y="577" textLength="613.2" lengthAdjust="spacingAndGlyphs">hesdor mcp list              MCP servers: scope, transport, status, login</text>
+<text x="32.8" y="596" textLength="403.2" lengthAdjust="spacingAndGlyphs">hesdor mcp add &lt;name&gt; &lt;command...&gt; | --url &lt;url&gt;</text>
+<text x="276.4" y="615" textLength="285.6" lengthAdjust="spacingAndGlyphs">Add a server to your user mcp.json</text>
+<text x="32.8" y="634" textLength="252.0" lengthAdjust="spacingAndGlyphs">hesdor mcp login|logout &lt;name&gt;</text>
 </g>
 </svg>
