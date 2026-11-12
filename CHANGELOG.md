@@ -7,6 +7,19 @@ the published CLI package (`packages/cli`).
 
 ## [Unreleased]
 
+### Added
+
+- 34 provider presets (77 in total). Coding plans: `zai-coding-plan`, `zhipu-coding-plan`, `kimi-code-cn`, `qwen-coding-plan-cn` (interactive only, like `qwen-coding-plan`). OpenCode Zen and Go over the Anthropic and Responses APIs: `opencode-zen-anthropic`, `opencode-zen-responses`, `opencode-go-anthropic`, `opencode-go-responses`. China-region endpoints: `moonshot-cn`, `zhipu`, `qwen-cn`, `minimax-cn`, `siliconflow-cn`, `volcengine`. Hosted: `ollama-cloud`, `synthetic`, `kilo`, `zenmux`, `poe`, `siliconflow`, `friendli`, `wandb`, `digitalocean`, `vultr`, `scaleway`, `ovhcloud`, `meta`, `xiaomi`, `longcat`, `inception`, `upstage`. Your account's endpoint: `cloudflare`, `databricks`, `snowflake`.
+- docs/providers.md shows how to use Google Vertex AI as a custom provider with `gcloud` tokens.
+
+### Changed
+
+- `hesdor --help` no longer lists every preset id; see `hesdor setup` or docs/providers.md.
+
+### Removed
+
+- `hesdor pricing` and the `hesdor` (Hesdor Cloud) preset: no service backs them yet.
+
 ## [0.2.0] - 2026-11-10
 
 This release rebuilds most of Hesdor. Highlights:
