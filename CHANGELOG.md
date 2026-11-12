@@ -11,6 +11,8 @@ the published CLI package (`packages/cli`).
 
 - 34 provider presets (77 in total). Coding plans: `zai-coding-plan`, `zhipu-coding-plan`, `kimi-code-cn`, `qwen-coding-plan-cn` (interactive only, like `qwen-coding-plan`). OpenCode Zen and Go over the Anthropic and Responses APIs: `opencode-zen-anthropic`, `opencode-zen-responses`, `opencode-go-anthropic`, `opencode-go-responses`. China-region endpoints: `moonshot-cn`, `zhipu`, `qwen-cn`, `minimax-cn`, `siliconflow-cn`, `volcengine`. Hosted: `ollama-cloud`, `synthetic`, `kilo`, `zenmux`, `poe`, `siliconflow`, `friendli`, `wandb`, `digitalocean`, `vultr`, `scaleway`, `ovhcloud`, `meta`, `xiaomi`, `longcat`, `inception`, `upstage`. Your account's endpoint: `cloudflare`, `databricks`, `snowflake`.
 - docs/providers.md shows how to use Google Vertex AI as a custom provider with `gcloud` tokens.
+- **VS Code extension** (`packages/vscode`): a Hesdor chat view over `hesdor acp` with streamed answers, reasoning, tool calls and the plan, build/plan/ask modes, stop and new session, proposed changes in the native diff editor with Allow/Reject, **Add Selection to Chat**, and `hesdor setup` in a terminal when no key is configured. Not on the Marketplace yet; build the `.vsix` with `pnpm --filter hesdor-vscode package`.
+- `hesdor acp` reads and writes files through the editor when the client offers ACP file access: unsaved changes are seen and edits land in the editor buffer, where undo works.
 
 ### Changed
 
