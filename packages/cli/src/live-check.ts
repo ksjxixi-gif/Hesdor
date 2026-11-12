@@ -16,7 +16,7 @@ const REQUESTS = 3
 /** Generous per-request input bound for the estimate (system prompt + tool spec + wire overhead). */
 const EST_INPUT_TOKENS = 1000
 /** Plans whose terms forbid automated use: tested only when named with --provider. */
-const SWEEP_SKIP = new Set(['qwen-coding-plan'])
+const SWEEP_SKIP = new Set(['qwen-coding-plan', 'qwen-coding-plan-cn'])
 
 export const GET_TIME: ToolSpec = {
   name: 'get_time',
