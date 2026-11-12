@@ -1,0 +1,123 @@
+{
+  "name": "hesdor-vscode",
+  "displayName": "Hesdor",
+  "description": "Chat with the Hesdor coding agent in VS Code: streamed answers, tool calls, plans, and file changes reviewed in the native diff editor.",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "publisher": "hesdor",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ksjxixi-gif/Hesdor.git",
+    "directory": "packages/vscode"
+  },
+  "homepage": "https://github.com/ksjxixi-gif/Hesdor#readme",
+  "bugs": {
+    "url": "https://github.com/ksjxixi-gif/Hesdor/issues"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "main": "./dist/extension.cjs",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "hesdor",
+          "title": "Hesdor",
+          "icon": "media/hesdor.svg"
+        }
+      ]
+    },
+    "views": {
+      "hesdor": [
+        {
+          "type": "webview",
+          "id": "hesdor.chat",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "hesdor.newSession",
+        "title": "New Session",
+        "category": "Hesdor",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hesdor.cancel",
+        "title": "Cancel",
+        "category": "Hesdor",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "hesdor.addSelection",
+        "title": "Add Selection to Chat",
+        "category": "Hesdor"
+      },
+      {
+        "command": "hesdor.setup",
+        "title": "Run Setup (choose a provider and key)",
+        "category": "Hesdor"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "hesdor.newSession",
+          "when": "view == hesdor.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "hesdor.cancel",
+          "when": "view == hesdor.chat",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "hesdor.addSelection",
+          "when": "editorHasSelection",
+          "group": "hesdor"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Hesdor",
+      "properties": {
+        "hesdor.path": {
+          "type": "string",
+          "default": "hesdor",
+          "markdownDescription": "The `hesdor` CLI to start (a name on PATH or a full path). When it is not found, `npx -y @dean_overlord/hesdor` is used.",
+          "scope": "machine"
+        },
+        "hesdor.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra arguments for `hesdor acp`, for example `[\"-p\", \"anthropic\"]` or `[\"--trust-workspace\"]`.",
+          "scope": "machine"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p webview/tsconfig.json && node build.mjs",
+    "typecheck": "tsc -p tsconfig.json && tsc -p webview/tsconfig.json",
+    "package": "pnpm build && vsce package --no-dependencies -o hesdor-vscode.vsix"
+  },
+  "devDependencies": {
+    "@agentclientprotocol/sdk": "^2.4.0",
+    "@types/vscode": "~1.95.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.28.2"
+  }
+}
