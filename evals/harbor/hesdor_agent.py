@@ -11,6 +11,7 @@ See evals/README.md.
 
 import os
 import shlex
+from pathlib import Path
 
 from harbor.agents.installed.base import (
     AgentAuthenticationError,
@@ -57,12 +58,16 @@ LOG = "/logs/agent"
 class Hesdor(BaseInstalledAgent):
     def __init__(
         self, *args, max_steps: int | str = 30, profile: str | None = None,
-        max_budget_usd: float | str | None = None, **kwargs,
+        max_budget_usd: float | str | None = None, tarball: str | None = None, **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self._max_steps = int(max_steps)
         self._profile = profile or None
         self._max_budget_usd = float(max_budget_usd) if max_budget_usd not in (None, "") else None
+        # A local `pnpm pack` of packages/cli, to benchmark an unreleased build instead of the npm release.
+        self._tarball = Path(tarball).resolve() if tarball else None
+        if self._tarball and not self._tarball.is_file():
+            raise FileNotFoundError(f"tarball not found: {self._tarball}")
 
     @staticmethod
     def name() -> str:
@@ -73,10 +78,14 @@ class Hesdor(BaseInstalledAgent):
 
     async def install(self, environment: BaseEnvironment) -> None:
         await self.ensure_system_dependencies(environment, ("curl",))
-        spec = f"@{self._version}" if self._version else "@latest"
+        if self._tarball:
+            await environment.upload_file(self._tarball, "/tmp/hesdor.tgz")
+            target = "/tmp/hesdor.tgz"
+        else:
+            target = PACKAGE + (f"@{self._version}" if self._version else "@latest")
         await self.exec_as_agent(
             environment,
-            command=f"set -euo pipefail; {nvm_node_install_snippet()} && npm install -g {PACKAGE}{spec} && hesdor --version",
+            command=f"set -euo pipefail; {nvm_node_install_snippet()} && npm install -g {target} && hesdor --version",
         )
 
     @with_prompt_template
