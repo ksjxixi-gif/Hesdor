@@ -12,7 +12,7 @@ import { createDefaultRegistry } from '../../registry.js'
 import { loadCassette, RecordingProvider, ReplayProvider } from '../replay.js'
 
 /**
- * Regression suite (report §9, G5): hand-authored cassettes replayed through the real
+ * Regression suite: hand-authored cassettes replayed through the real
  * agent loop and real tools in a throwaway Git repository. Each cassette's `match`
  * blocks pin what the loop must send back to the model, so drift fails loudly.
  */
