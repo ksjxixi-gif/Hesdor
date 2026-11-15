@@ -5,7 +5,9 @@ All notable changes to Hesdor are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions refer to
 the published CLI package (`packages/cli`).
 
-## [Unreleased]
+## [0.3.0] - 2026-11-15
+
+Released as standalone binaries on GitHub only. The npm package `@dean_overlord/hesdor` stays at 0.1.0 for now, so the update check (which reads npm) does not announce this version.
 
 ### Added
 
@@ -17,6 +19,8 @@ the published CLI package (`packages/cli`).
 ### Changed
 
 - `hesdor --help` no longer lists every preset id; see `hesdor setup` or docs/providers.md.
+- The GitHub Action installs the release binary with `packaging/install.sh` instead of running the npm package, so it needs a Linux or macOS runner.
+- The README installs from the release binaries; npm publishing in the release workflow runs only when the repository variable `NPM_PUBLISH` is `true`.
 
 ### Removed
 
@@ -184,6 +188,7 @@ First public release of the Hesdor CLI (`@dean_overlord/hesdor`).
 - Project context from `HESDOR.md`, `.hesdorignore` and repository metadata.
 - Extensions: custom slash commands, skills, plugins and MCP servers.
 
-[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ksjxixi-gif/Hesdor/releases/tag/v0.2.0
 [0.1.0]: https://www.npmjs.com/package/@dean_overlord/hesdor/v/0.1.0
