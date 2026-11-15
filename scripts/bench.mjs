@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Performance budgets (report G8). Needs a build first: pnpm build
+// Performance budgets. Needs a build first: pnpm build
 //
 //   node scripts/bench.mjs            cold start + diff
 //   node scripts/bench.mjs --json     machine-readable output
