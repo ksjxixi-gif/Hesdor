@@ -6,6 +6,7 @@ import type { LoadedPlugin, RepoContextInfo, ToolContext } from '@hesdor/agent-c
 import type { AgentMode, AgentResult, ChatImage, ChatMessage, ModelProvider, RunEvent, Usage } from '@hesdor/protocol'
 import { getModelInfo, requestCostUsd } from '@hesdor/providers'
 import type { CliFlags } from './args.js'
+import { runClaudeCodeTurn } from './claude-code.js'
 import type { HesdorConfig } from './config.js'
 import { createSelectedProvider } from './provider-setup.js'
 import type { ProviderSelection } from './provider-setup.js'
@@ -174,6 +175,8 @@ export interface Escalation {
 
 /** One agent turn with the explore subagent wired in; usage includes the subagent's tokens. */
 export async function runTurn(opts: TurnOptions): Promise<TurnResult> {
+  // The user's own Claude Code runs the whole turn (its tools and permissions); see claude-code.ts.
+  if (opts.provider.name === 'claude-code') return runClaudeCodeTurn(opts)
   let lastProviderError: unknown
   const raw = opts.provider
   const info = getModelInfo(raw.name, raw.model)
