@@ -23,6 +23,9 @@ export interface ProviderPreset {
   defaultModel: string
 }
 
+/** Models the `claude-code` preset offers: Claude Code's own aliases; 'default' leaves the choice to Claude Code. */
+export const CLAUDE_CODE_MODELS: readonly string[] = ['default', 'opus', 'sonnet', 'haiku']
+
 /**
  * Provider catalog. Every OpenAI-compatible preset is one entry; adding a new
  * compatible provider is a single line here.
@@ -46,6 +49,15 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
     baseUrl: 'https://api.openai.com/v1',
     requiresApiKey: false,
     defaultModel: 'gpt-6.1-sol',
+  },
+  {
+    id: 'claude-code',
+    label: 'Claude Code (your Claude plan, runs your signed-in claude CLI)',
+    // Not a model API: Hesdor runs the user's own `claude -p` and shows its work (cli/src/claude-code.ts).
+    // Hesdor never reads a Claude credential; `kind` is nominal.
+    kind: 'anthropic',
+    requiresApiKey: false,
+    defaultModel: 'default',
   },
   {
     id: 'anthropic',
