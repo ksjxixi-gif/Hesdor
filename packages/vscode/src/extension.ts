@@ -91,8 +91,10 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
 <section id="plan" aria-label="Plan"></section>
 <footer>
   <div id="context"></div>
-  <textarea id="input" rows="3" aria-label="Message Hesdor" placeholder="Ask Hesdor… (Enter to send, Shift+Enter for a new line)"></textarea>
-  <button id="send" type="button">Send</button>
+  <div class="composer">
+    <textarea id="input" rows="2" aria-label="Message Hesdor" placeholder="Ask Hesdor… (Enter to send, Shift+Enter for a new line)"></textarea>
+    <button id="send" type="button" title="Send (Enter)">Send</button>
+  </div>
 </footer>
 <script nonce="${nonce}" src="${js}"></script>
 </body>
