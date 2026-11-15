@@ -473,7 +473,7 @@ async function executeCall(
       if (!approved) throw new PermissionDeniedError(`denied: a hook asked for approval and it was not given${pre.ask ? ` (${pre.ask})` : ''}`)
     }
 
-    // Taint (roadmap C7): once web or MCP output is in the conversation, approval prompts say so.
+    // Taint: once web or MCP output is in the conversation, approval prompts say so.
     const toolCtx: ToolContext = ctx.state.tainted
       ? { ...ctx, requestApproval: (req) => ctx.requestApproval({ ...req, title: `${req.title} (after reading web/MCP content)` }) }
       : ctx
