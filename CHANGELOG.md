@@ -5,7 +5,7 @@ All notable changes to Hesdor are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions refer to
 the published CLI package (`packages/cli`).
 
-## [Unreleased]
+## [0.3.1] - 2026-11-15
 
 ### Added
 
@@ -14,11 +14,14 @@ the published CLI package (`packages/cli`).
 ### Fixed
 
 - Provider errors show the provider's own message from a JSON error body instead of the raw JSON.
-
 - A base URL pasted with its endpoint path (`https://host/v1/chat/completions`, `…/responses`, `…/messages`) no longer doubles the path into a 404; model listing works with it too.
 - `hesdor setup` asks for a custom provider's name in plain words and refuses an all-digit name, which read as a menu number.
 - The TUI shows a failed turn's error once instead of twice, and Tab no longer logs a `mode →` line per press (the footer shows the mode).
 - VS Code extension: long errors wrap instead of scrolling sideways, your messages show as bubbles, the message box grows as you type, and the view's Stop button appears only while a turn runs (New and Stop live in the view's title bar only).
+
+### Removed
+
+- `pnpm test:coverage` and its Vitest coverage config: the coverage provider was never installed, so the script failed out of the box.
 
 ## [0.3.0] - 2026-11-15
 
@@ -203,7 +206,8 @@ First public release of the Hesdor CLI (`@dean_overlord/hesdor`).
 - Project context from `HESDOR.md`, `.hesdorignore` and repository metadata.
 - Extensions: custom slash commands, skills, plugins and MCP servers.
 
-[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ksjxixi-gif/Hesdor/releases/tag/v0.2.0
 [0.1.0]: https://www.npmjs.com/package/@dean_overlord/hesdor/v/0.1.0
