@@ -92,7 +92,7 @@ Options: `-Version`, `-InstallDir`, `-NoPath` for PowerShell; `HESDOR_VERSION` a
 node scripts/release/update-manifests.mjs 0.2.0      # or --sums path/to/SHA256SUMS
 ```
 
-The committed manifests carry placeholder (all-zero) hashes until the first release with binaries. Submission is manual for now:
+The committed manifests match the latest release; regenerate them with the command above after each one. Submission is manual for now:
 
 - **Homebrew:** create the public repo `ksjxixi-gif/homebrew-tap` and copy `packaging/homebrew/hesdor.rb` to `Formula/hesdor.rb`. On a Mac, `brew install --formula ./Formula/hesdor.rb`, then `brew test hesdor` and `brew audit --strict --online hesdor`. Users run `brew install ksjxixi-gif/tap/hesdor`, and recent Homebrew may ask them to trust a third-party tap first. Copy the regenerated formula into the tap for each release.
 - **Scoop:** create a bucket repo, for example `ksjxixi-gif/scoop-bucket` from [ScoopInstaller/BucketTemplate](https://github.com/ScoopInstaller/BucketTemplate), and add `packaging/scoop/hesdor.json` as `bucket/hesdor.json`. The template's Excavator workflow runs `checkver` daily; with `checkver: github` and `autoupdate` reading `SHA256SUMS`, new releases are picked up without manual edits. Users run `scoop bucket add hesdor https://github.com/ksjxixi-gif/scoop-bucket` then `scoop install hesdor/hesdor`.
