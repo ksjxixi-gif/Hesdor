@@ -3,28 +3,28 @@
 class Hesdor < Formula
   desc "Local-first AI software engineering agent for the terminal"
   homepage "https://github.com/ksjxixi-gif/Hesdor"
-  version "0.1.0"
+  version "0.3.0"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.1.0/hesdor-macos-arm64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.3.0/hesdor-macos-arm64.tar.gz"
+      sha256 "e1ca2090defdaf1b7c6e71f7c59d622c2a364d6707d604e4a7212728469d96f7"
     end
     on_intel do
-      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.1.0/hesdor-macos-x64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.3.0/hesdor-macos-x64.tar.gz"
+      sha256 "5bd1c266e7e355b3117efaa2a60690c712e308464a9aa6d813bad7c3df810324"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.1.0/hesdor-linux-arm64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.3.0/hesdor-linux-arm64.tar.gz"
+      sha256 "d2d15590c6bff9b473b594c7c14259e4e701bea5a4c5c4468977f0bf326ca874"
     end
     on_intel do
-      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.1.0/hesdor-linux-x64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      url "https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.3.0/hesdor-linux-x64.tar.gz"
+      sha256 "1f465742954ea21b4e540a0a6520ebbf843a61563fe4f240dc51debb828ea78b"
     end
   end
 
