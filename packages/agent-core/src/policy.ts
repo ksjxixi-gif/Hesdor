@@ -179,7 +179,7 @@ export function classifyCommand(argv: string[]): CommandClassification {
 
   // Anything that runs code we cannot see asks first: a shell, inline code,
   // a freshly downloaded package, or a wrapper around another command.
-  // shortcut: a denylist stopgap; replace with allow/ask/deny rules (roadmap C5).
+  // shortcut: a denylist; programs it misses are caught only by permission rules (below), so add an entry when one slips through.
   if (SHELL_PROGRAMS.has(base)) {
     return { program: base, destructive: true, network: false, reason: 'runs a shell, which can execute anything' }
   }
@@ -218,7 +218,7 @@ export function classifyCommand(argv: string[]): CommandClassification {
   return { program: base, destructive: false, network: false }
 }
 
-// ── Permission rules (roadmap C5) ─────────────────────────────────────────
+// ── Permission rules ─────────────────────────────────────────
 
 /**
  * A command rule is an argv prefix: `["pnpm", "test"]`, or the same as one string
