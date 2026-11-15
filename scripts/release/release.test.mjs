@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
@@ -125,6 +125,25 @@ describe('install.ps1', { skip: process.platform !== 'win32' && 'Windows only' }
       const r = await install(dir, version)
       assert.equal(r.status, 0, r.stdout + r.stderr)
       assert.equal(readFileSync(path.join(dir, 'hesdor.exe'), 'utf8'), 'fake hesdor binary\n')
+    }
+  })
+
+  test('upgrades over a running hesdor.exe', async () => {
+    writeFileSync(path.join(rel.dir, 'SHA256SUMS'), rel.good)
+    const dir = path.join(tmp, 'running')
+    mkdirSync(dir, { recursive: true })
+    // Any long-running program stands in for a hesdor session that is still open.
+    copyFileSync(path.join(process.env.SystemRoot, 'System32', 'PING.EXE'), path.join(dir, 'hesdor.exe'))
+    const running = spawn(path.join(dir, 'hesdor.exe'), ['-n', '30', '127.0.0.1'], { stdio: 'ignore' })
+    try {
+      await new Promise((resolve) => running.once('spawn', resolve))
+      const r = await install(dir, '9.9.9')
+      assert.equal(r.status, 0, r.stdout + r.stderr)
+      assert.equal(readFileSync(path.join(dir, 'hesdor.exe'), 'utf8'), 'fake hesdor binary\n')
+      // A second upgrade cleans up what it can (the copy still running stays).
+      assert.equal((await install(dir, '9.9.9')).status, 0)
+    } finally {
+      running.kill()
     }
   })
 
