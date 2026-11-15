@@ -5,11 +5,15 @@ All notable changes to Hesdor are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions refer to
 the published CLI package (`packages/cli`).
 
-## [Unreleased]
+## [0.3.2] - 2026-11-15
 
 ### Added
 
 - `claude-code` provider: use your Claude plan through your own signed-in Claude Code. Each turn runs `claude -p` in the workspace and Hesdor shows its answer, tool calls, file changes and plan in the TUI, headless runs and editors; later turns continue the same Claude Code conversation. Hesdor never touches a Claude credential, and Claude Code's own tools and permission settings apply. See docs/subscriptions.md.
+
+### Fixed
+
+- `install.ps1` upgrades while `hesdor` is running: Windows can't overwrite a running program, so the script moves the old copy aside and deletes it on a later upgrade.
 
 ## [0.3.1] - 2026-11-15
 
@@ -212,7 +216,8 @@ First public release of the Hesdor CLI (`@dean_overlord/hesdor`).
 - Project context from `HESDOR.md`, `.hesdorignore` and repository metadata.
 - Extensions: custom slash commands, skills, plugins and MCP servers.
 
-[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ksjxixi-gif/Hesdor/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ksjxixi-gif/Hesdor/releases/tag/v0.2.0
