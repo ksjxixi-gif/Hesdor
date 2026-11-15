@@ -3,6 +3,18 @@ import type { StreamChunk } from '@hesdor/protocol'
 import { createProvider, fetchModels } from './factory.js'
 import { OpenAICompatibleProvider } from './openai-compatible.js'
 import { AnthropicProvider } from './anthropic.js'
+import { joinUrl } from './provider.js'
+
+describe('joinUrl', () => {
+  it('drops a trailing slash and an endpoint path pasted into the base URL', () => {
+    expect(joinUrl('https://x.ai/v1/', '/chat/completions')).toBe('https://x.ai/v1/chat/completions')
+    expect(joinUrl('https://x.ai/v1/chat/completions', '/chat/completions')).toBe('https://x.ai/v1/chat/completions')
+    expect(joinUrl('https://x.ai/v1/chat/completions/', '/models')).toBe('https://x.ai/v1/models')
+    expect(joinUrl('https://x.ai/v1/responses', '/responses')).toBe('https://x.ai/v1/responses')
+    expect(joinUrl('https://x.ai/v1/messages', '/v1/messages')).toBe('https://x.ai/v1/messages')
+    expect(joinUrl('https://x.ai', '/v1/messages')).toBe('https://x.ai/v1/messages')
+  })
+})
 
 describe('OpenAICompatibleProvider', () => {
   it('emits usage after the finish reason so the loop can account for it', async () => {
