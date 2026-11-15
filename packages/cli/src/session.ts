@@ -174,7 +174,7 @@ export async function createSession(opts: CreateSessionOptions): Promise<Session
     // Managed settings can turn MCP off in every scope.
     const servers = managed.disableMcp ? {} : await readMcpConfigs([path.join(globalDir, 'mcp.json'), ...projectMcp])
     state.mcpServerNames = Object.keys(servers)
-    // Tool annotations count only for servers from the user's own file that no project file overrides (C8).
+    // Tool annotations count only for servers from the user's own file that no project file overrides.
     const userNames = Object.keys(await readMcpConfigs([path.join(globalDir, 'mcp.json')]))
     const projectNames = new Set(Object.keys(await readMcpConfigs(projectMcp)))
     mcpConfigs = Object.fromEntries(Object.entries(servers).map(([n, config]) => [n, { config, scope: projectNames.has(n) ? 'project' : 'user' }]))
