@@ -110,7 +110,7 @@ function render(s: ViewState): void {
     contextBox.append(el('span', 'chips', `Attached: ${s.context.join(', ')}`), button('Clear', () => send({ type: 'clearContext' })))
   }
   sendButton.disabled = s.busy
-  cancelButton.disabled = !s.busy
+  cancelButton.hidden = !s.busy
 }
 
 function submit(): void {
