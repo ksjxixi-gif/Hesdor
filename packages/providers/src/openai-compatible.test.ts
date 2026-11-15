@@ -3,7 +3,19 @@ import type { StreamChunk } from '@hesdor/protocol'
 import { createProvider, fetchModels } from './factory.js'
 import { OpenAICompatibleProvider } from './openai-compatible.js'
 import { AnthropicProvider } from './anthropic.js'
-import { joinUrl } from './provider.js'
+import { joinUrl, ProviderError } from './provider.js'
+
+describe('ProviderError', () => {
+  it("shows the provider's own message from a JSON body and keeps the raw body", () => {
+    const body = '{"error":{"code":"model_not_found","message":"Model \\"local-model\\" is not offered here."}}'
+    const err = new ProviderError('provider request failed with HTTP 404', { status: 404, body })
+    expect(err.message.split('\n')[0]).toBe('provider request failed with HTTP 404: Model "local-model" is not offered here.')
+    expect(err.body).toBe(body)
+    expect(err.kind).toBe('model_not_found')
+    expect(new ProviderError('x', { status: 500, body: '{"error":"boom"}' }).message).toMatch(/^x: boom/)
+    expect(new ProviderError('x', { status: 502, body: '<html>bad gateway</html>' }).message).toMatch(/^x: <html>bad gateway<\/html>/)
+  })
+})
 
 describe('joinUrl', () => {
   it('drops a trailing slash and an endpoint path pasted into the base URL', () => {
