@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/ksjxixi-gif/Hesdor/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/ksjxixi-gif/Hesdor/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://www.npmjs.com/package/@dean_overlord/hesdor"><img alt="npm" src="https://img.shields.io/npm/v/%40dean_overlord%2Fhesdor"></a>
+  <a href="https://github.com/ksjxixi-gif/Hesdor/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/ksjxixi-gif/Hesdor"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <img alt="Node 22 or newer" src="https://img.shields.io/badge/node-%3E%3D22-339933">
 </p>
@@ -27,20 +27,16 @@
 
 ## Install
 
-Requires Node.js 22 or newer.
-
-```bash
-npm i -g @dean_overlord/hesdor
-```
-
-Without Node.js (0.2.0 and later): standalone binaries for Windows, Linux and macOS are attached to each GitHub release, and the install scripts verify their checksum.
+Standalone binaries for Windows, Linux and macOS are attached to each [GitHub release](https://github.com/ksjxixi-gif/Hesdor/releases) and need no Node.js. The install scripts verify their checksum.
 
 ```bash
 irm https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging/install.ps1 | iex     # Windows PowerShell
 curl -fsSL https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging/install.sh | sh   # macOS, Linux
 ```
 
-Or from source:
+The npm package `@dean_overlord/hesdor` stays at 0.1.0 for now; newer versions ship as binaries only.
+
+Or from source (Node.js 22 or newer):
 
 ```bash
 git clone https://github.com/ksjxixi-gif/Hesdor && cd Hesdor
