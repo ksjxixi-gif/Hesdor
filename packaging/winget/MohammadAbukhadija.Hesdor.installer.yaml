@@ -2,7 +2,7 @@
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 
 PackageIdentifier: MohammadAbukhadija.Hesdor
-PackageVersion: 0.1.0
+PackageVersion: 0.3.0
 InstallerType: zip
 NestedInstallerType: portable
 NestedInstallerFiles:
@@ -12,7 +12,7 @@ Commands:
 - hesdor
 Installers:
 - Architecture: x64
-  InstallerUrl: https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.1.0/hesdor-win-x64.zip
-  InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+  InstallerUrl: https://github.com/ksjxixi-gif/Hesdor/releases/download/v0.3.0/hesdor-win-x64.zip
+  InstallerSha256: 945E05F9D7E126A8F2E10030489D2809C24027574AE94AE437D49B903BBF0999
 ManifestType: installer
 ManifestVersion: 1.12.0
