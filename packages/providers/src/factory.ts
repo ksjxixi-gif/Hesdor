@@ -7,7 +7,7 @@ import type { OpenAICompatibleConfig } from './openai-compatible.js'
 import { OpenAIResponsesProvider } from './openai-responses.js'
 import type { Effort, ModelProvider } from './provider.js'
 import { applyEnvProxy, joinUrl, resolveKey } from './provider.js'
-import { getPreset, PROVIDER_PRESETS } from './presets.js'
+import { CLAUDE_CODE_MODELS, getPreset, PROVIDER_PRESETS } from './presets.js'
 import type { ProviderKind } from './presets.js'
 
 export interface CreateProviderOptions {
@@ -52,6 +52,17 @@ export function createProvider(opts: CreateProviderOptions): ModelProvider {
 
   const kind = preset?.kind ?? opts.customKind!
   const model = opts.model || preset?.defaultModel || 'local-model'
+  if (preset?.id === 'claude-code') {
+    // The CLI runs these turns through the user's Claude Code (runTurn); nothing may call the model directly.
+    return {
+      name: 'claude-code',
+      model,
+      // eslint-disable-next-line require-yield
+      async *stream() {
+        throw new Error('the claude-code provider runs whole turns through Claude Code; it has no model API')
+      },
+    }
+  }
   const apiKey = opts.apiKey ?? (preset?.envKey ? process.env[preset.envKey] : undefined)
 
   if (preset?.requiresApiKey && !apiKey && !opts.apiKeyCommand?.length) {
@@ -123,6 +134,7 @@ export async function fetchModels(opts: {
   const preset = getPreset(opts.provider)
   if (!preset && !opts.customKind) throw new Error(`unknown provider "${opts.provider}"`)
 
+  if (preset?.id === 'claude-code') return [...CLAUDE_CODE_MODELS]
   const kind = preset?.kind ?? opts.customKind!
   const base = opts.baseUrl ?? preset?.baseUrl
   if (!base) throw new Error(`provider "${opts.provider}" requires a base URL`)
