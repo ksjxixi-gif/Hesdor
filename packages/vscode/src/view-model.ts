@@ -21,8 +21,8 @@ export interface ViewState {
   items: Item[]
   plan: acp.PlanEntry[]
   busy: boolean
-  modes: acp.SessionMode[]
-  mode?: string
+  /** The agent's session settings (mode, model), each shown as a dropdown. */
+  options: acp.SessionConfigOption[]
   /** Labels of editor selections attached to the next prompt. */
   context: string[]
 }
@@ -33,7 +33,7 @@ export type FromView =
   | { type: 'prompt'; text: string }
   | { type: 'cancel' }
   | { type: 'newSession' }
-  | { type: 'setMode'; modeId: string }
+  | { type: 'setOption'; configId: string; value: string }
   | { type: 'permission'; id: number; optionId: string | null }
   | { type: 'showDiff'; item: number; diff: number }
   | { type: 'clearContext' }
@@ -42,7 +42,13 @@ export type FromView =
 /** Extension host → webview. */
 export type ToView = { type: 'state'; state: ViewState }
 
-export const initialState = (): ViewState => ({ items: [], plan: [], busy: false, modes: [], context: [] })
+export const initialState = (): ViewState => ({ items: [], plan: [], busy: false, options: [], context: [] })
+
+/** Sets one option's current value in place (the agent's reply replaces the whole list later). */
+export function setOption(s: ViewState, configId: string, value: string): void {
+  const o = s.options.find((x) => x.id === configId)
+  if (o && o.type === 'select') o.currentValue = value
+}
 
 const blockText = (block: acp.ContentBlock): string =>
   block.type === 'text' ? block.text : block.type === 'resource_link' ? `[${block.name}](${block.uri})` : ''
@@ -92,7 +98,9 @@ export function applyUpdate(s: ViewState, u: acp.SessionUpdate): void {
       s.plan = u.entries
       return
     case 'current_mode_update':
-      s.mode = u.currentModeId
+      return setOption(s, 'mode', u.currentModeId)
+    case 'config_option_update':
+      s.options = u.configOptions
       return
     case 'notice':
       s.items.push({ kind: 'notice', severity: u.severity, text: u.description ? `${u.title}: ${u.description}` : u.title })
