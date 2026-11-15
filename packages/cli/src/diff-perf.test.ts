@@ -3,7 +3,7 @@ import { MAX_DIFF_EDITS, showWhitespace, unifiedDiff } from './diff.js'
 
 const file = (lines: number): string => Array.from({ length: lines }, (_, i) => `line ${i}`).join('\n') + '\n'
 
-describe('unifiedDiff performance (G8 budget)', () => {
+describe('unifiedDiff performance budget', () => {
   it('diffs a 2k-line file with one edit', () => {
     const before = file(2000)
     const out = unifiedDiff(before, before.replace('line 1000\n', 'line 1000 edited\n'))
