@@ -1331,8 +1331,7 @@ export function App({
         return
       }
       const next = mode === 'build' ? 'plan' : mode === 'plan' ? 'ask' : 'build'
-      setMode(next)
-      pushItem({ kind: 'status', text: `mode → ${next}`, tone: 'info' })
+      setMode(next) // the footer shows the mode; a log line per Tab press floods the activity pane
       return
     }
 
