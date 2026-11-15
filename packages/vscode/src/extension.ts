@@ -6,7 +6,7 @@ import { NPX_FALLBACK, cmdQuote, resolveCommand, startAgent } from './agent.js'
 import type { AgentProcess, Command } from './agent.js'
 import { readTextFile, writeTextFile } from './fs-handlers.js'
 import type { EditorFiles } from './fs-handlers.js'
-import { addPermission, answerPermission, applyUpdate, initialState, permissionResponse } from './view-model.js'
+import { addPermission, answerPermission, applyUpdate, initialState, permissionResponse, setOption } from './view-model.js'
 import type { Diff, FromView, ToView, ViewState } from './view-model.js'
 
 const DIFF_SCHEME = 'hesdor-diff'
@@ -49,6 +49,7 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
   private agent: AgentProcess | undefined
   private starting: Promise<AgentProcess> | undefined
   private sessionId: string | undefined
+  private sessionStarting: Promise<string> | undefined
   private nextPermission = 0
   private readonly pending = new Map<number, { options: acp.PermissionOption[]; resolve: (r: acp.RequestPermissionResponse) => void }>()
   private attached: acp.EmbeddedResourceResource[] = []
@@ -81,19 +82,16 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
 <title>Hesdor</title>
 </head>
 <body>
-<header>
-  <label for="mode">Mode</label>
-  <select id="mode"></select>
-  <button id="new" type="button" title="Start a new session">New</button>
-  <button id="cancel" type="button" title="Stop the running turn">Stop</button>
-</header>
 <main id="log" role="log" aria-label="Conversation"></main>
 <section id="plan" aria-label="Plan"></section>
 <footer>
   <div id="context"></div>
   <div class="composer">
     <textarea id="input" rows="2" aria-label="Message Hesdor" placeholder="Ask Hesdor… (Enter to send, Shift+Enter for a new line)"></textarea>
-    <button id="send" type="button" title="Send (Enter)">Send</button>
+    <div class="bar">
+      <div id="options"></div>
+      <button id="send" type="button" title="Send (Enter)">Send</button>
+    </div>
   </div>
 </footer>
 <script nonce="${nonce}" src="${js}"></script>
@@ -113,15 +111,18 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
   private async onMessage(m: FromView): Promise<void> {
     switch (m.type) {
       case 'ready':
-        return this.post()
+        this.post()
+        // Start the session when the view opens, so the mode and model menus (or a setup error) show before the first message.
+        if (!this.sessionId && this.state.items.length === 0) await this.ensureSession()
+        return
       case 'prompt':
         return this.prompt(m.text)
       case 'cancel':
         return this.cancel()
       case 'newSession':
         return this.newSession()
-      case 'setMode':
-        return this.setMode(m.modeId)
+      case 'setOption':
+        return this.setOption(m.configId, m.value)
       case 'permission': {
         const p = this.pending.get(m.id)
         if (!p) return
@@ -143,6 +144,12 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
       case 'setup':
         return this.runSetup()
     }
+  }
+
+  /** Also a context key, so the view's Stop button shows only while a turn runs. */
+  private setBusy(busy: boolean): void {
+    this.state.busy = busy
+    void vscode.commands.executeCommand('setContext', 'hesdor.busy', busy)
   }
 
   private fail(err: unknown): void {
@@ -186,7 +193,7 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
         this.agent = undefined
         this.sessionId = undefined
         if (this.state.busy) this.fail(new Error('Hesdor stopped; see the Hesdor output channel. Send again to restart it.'))
-        this.state.busy = false
+        this.setBusy(false)
         this.post()
       })
       this.agent = agent
@@ -199,20 +206,26 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
 
   private async ensureSession(): Promise<{ agent: AgentProcess; sessionId: string }> {
     const agent = await this.ensureAgent()
-    if (!this.sessionId) {
-      const res = await agent.connection.agent.request('session/new', { cwd: this.cwd(), mcpServers: [] })
-      this.sessionId = res.sessionId
-      this.state.modes = res.modes?.availableModes ?? []
-      if (res.modes) this.state.mode = res.modes.currentModeId
-      this.post()
-    }
-    return { agent, sessionId: this.sessionId }
+    if (this.sessionId) return { agent, sessionId: this.sessionId }
+    // One session/new at a time: opening the view and a first message can both ask for a session.
+    this.sessionStarting ??= agent.connection.agent
+      .request('session/new', { cwd: this.cwd(), mcpServers: [] })
+      .then((res) => {
+        this.sessionId = res.sessionId
+        this.state.options = res.configOptions ?? []
+        this.post()
+        return res.sessionId
+      })
+      .finally(() => {
+        this.sessionStarting = undefined
+      })
+    return { agent, sessionId: await this.sessionStarting }
   }
 
   private async prompt(text: string): Promise<void> {
     if (!text.trim() || this.state.busy) return
     this.state.items.push({ kind: 'user', text })
-    this.state.busy = true
+    this.setBusy(true)
     this.post()
     const context = this.attached
     this.attached = []
@@ -226,7 +239,7 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
     } catch (err) {
       this.fail(err)
     } finally {
-      this.state.busy = false
+      this.setBusy(false)
       this.post()
     }
   }
@@ -242,13 +255,16 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
     this.sessionId = undefined
     this.state = { ...initialState(), context: this.state.context }
     this.post()
+    await this.ensureSession().catch((err) => this.fail(err))
   }
 
-  private async setMode(modeId: string): Promise<void> {
-    this.state.mode = modeId
+  private async setOption(configId: string, value: string): Promise<void> {
+    setOption(this.state, configId, value)
     this.post()
     const { agent, sessionId } = await this.ensureSession()
-    await agent.connection.agent.request('session/set_mode', { sessionId, modeId })
+    const res = await agent.connection.agent.request('session/set_config_option', { sessionId, configId, value })
+    this.state.options = res.configOptions
+    this.post()
   }
 
   private askPermission(req: acp.RequestPermissionRequest, signal: AbortSignal): Promise<acp.RequestPermissionResponse> {
