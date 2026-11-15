@@ -12,6 +12,7 @@ the published CLI package (`packages/cli`).
 - A base URL pasted with its endpoint path (`https://host/v1/chat/completions`, `…/responses`, `…/messages`) no longer doubles the path into a 404; model listing works with it too.
 - `hesdor setup` asks for a custom provider's name in plain words and refuses an all-digit name, which read as a menu number.
 - The TUI shows a failed turn's error once instead of twice, and Tab no longer logs a `mode →` line per press (the footer shows the mode).
+- VS Code extension: long errors wrap instead of scrolling sideways, your messages show as bubbles, the message box grows as you type, and Stop appears only while a turn runs.
 
 ## [0.3.0] - 2026-11-15
 
