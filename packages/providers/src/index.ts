@@ -8,7 +8,7 @@ export { createProvider, UnknownProviderError, fetchModels } from './factory.js'
 export type { CreateProviderOptions } from './factory.js'
 export type { Effort, ModelProvider } from './provider.js'
 export { applyEnvProxy, EFFORTS, ProviderError, joinUrl } from './provider.js'
-export { PROVIDER_KINDS, PROVIDER_PRESETS, getPreset } from './presets.js'
+export { CLAUDE_CODE_MODELS, PROVIDER_KINDS, PROVIDER_PRESETS, getPreset } from './presets.js'
 export {
   CHATGPT_API_BASE,
   CHATGPT_ISSUER,
