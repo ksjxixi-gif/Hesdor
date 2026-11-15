@@ -7,7 +7,7 @@ import { realPathOf } from './paths.js'
 import { hesdorGlobalDir } from './plugins.js'
 
 /**
- * Turn checkpoints (roadmap C6) in a shadow Git repository that lives OUTSIDE the
+ * Turn checkpoints in a shadow Git repository that lives OUTSIDE the
  * project, in the user config dir keyed by the workspace's real path. Each snapshot is
  * `git --git-dir=<shadow> --work-tree=<root> add -A`, so it covers files changed by tools
  * and by shell commands, honours .gitignore, and stores exact bytes (binaries included).
