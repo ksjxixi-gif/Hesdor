@@ -8,6 +8,8 @@ const MODELS_DEV_ID = {
   openai: 'openai',
   // Account-specific catalog from GET /v1/models with the ChatGPT sign-in; the login picks a listed model.
   chatgpt: null,
+  // Runs the user's own Claude Code with its own model aliases; no catalog to drift from.
+  'claude-code': null,
   anthropic: 'anthropic',
   openrouter: 'openrouter',
   groq: 'groq',
