@@ -37,7 +37,8 @@ export class ProviderError extends Error {
     const text = `${message} ${options?.body ?? ''}`
     const kind = options?.kind ?? classify(options?.status, text)
     const hint = options?.hint ?? (/subscription_sharing_usage_limit_exceeded/.test(text) ? CHATGPT_LIMIT_HINT : HINTS[kind])
-    super(`${options?.body ? `${message}: ${options.body}` : message}${hint ? `\nhint: ${hint}` : ''}`)
+    const shown = options?.body ? readableBody(options.body) : ''
+    super(`${shown ? `${message}: ${shown}` : message}${hint ? `\nhint: ${hint}` : ''}`)
     this.name = 'ProviderError'
     this.status = options?.status
     this.body = options?.body
@@ -45,6 +46,19 @@ export class ProviderError extends Error {
     this.retryable = options?.retryable ?? RETRYABLE.has(kind)
     this.retryAfterMs = options?.retryAfterMs
   }
+}
+
+/** The message inside a JSON error body (`{"error":{"message":…}}`, `{"error":"…"}`, `{"message":…}`), else the body as is. */
+export function readableBody(body: string): string {
+  try {
+    const j = JSON.parse(body) as { error?: unknown; message?: unknown }
+    const e = j.error
+    const m = typeof e === 'string' ? e : typeof e === 'object' && e !== null && 'message' in e ? (e as { message: unknown }).message : j.message
+    if (typeof m === 'string' && m.trim()) return m.trim()
+  } catch {
+    // not JSON
+  }
+  return body
 }
 
 /** Map an HTTP status and/or error text to a kind. Text rules cover in-stream errors that have no status. */
