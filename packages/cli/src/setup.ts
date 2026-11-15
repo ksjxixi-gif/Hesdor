@@ -79,12 +79,13 @@ export async function runSetup(): Promise<number> {
       const isCustom = answer === 'custom' || answer === 'other' || Number(answer) === PROVIDER_PRESETS.length + 1
       if (isCustom) {
         for (;;) {
-          const customId = (await ask('Provider id (letters, numbers, ., _ or -): ')).trim().toLowerCase()
-          if (/^[a-z0-9][a-z0-9._-]{0,39}$/.test(customId) && !getPreset(customId) && customId !== 'custom') {
+          const customId = (await ask('Name for this provider, used with -p (e.g. my-gateway): ')).trim().toLowerCase()
+          // All digits would read as a menu number.
+          if (/^[a-z0-9][a-z0-9._-]{0,39}$/.test(customId) && !/^\d+$/.test(customId) && !getPreset(customId) && customId !== 'custom') {
             providerId = customId
             break
           }
-          console.log('Use a new provider id with 1-40 letters, numbers, dots, underscores or hyphens.')
+          console.log('Use a new name with 1-40 letters, numbers, dots, underscores or hyphens, not only digits.')
         }
         for (;;) {
           const format = (await ask('API format [openai]: ')).trim().toLowerCase() || 'openai'
