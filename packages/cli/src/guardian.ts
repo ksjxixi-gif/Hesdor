@@ -3,7 +3,7 @@ import type { ApprovalRequest, ToolContext } from '@hesdor/agent-core'
 import type { ChatMessage, ModelProvider, RunEvent, Usage } from '@hesdor/protocol'
 
 /**
- * Guardian auto-review (C14): a cheap tool-less model looks at an approval that no rule
+ * Guardian auto-review: a cheap tool-less model looks at an approval that no rule
  * settles and may allow it so the human is not asked. It fails closed: a deny, an error or
  * a timeout falls back to the human, and rule-driven asks never reach it.
  */
