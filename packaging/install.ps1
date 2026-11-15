@@ -31,8 +31,12 @@ try {
 
   Expand-Archive -Path (Join-Path $tmp $asset) -DestinationPath (Join-Path $tmp 'x') -Force
   New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-  Copy-Item -Force (Join-Path $tmp 'x\*') $InstallDir
   $exe = Join-Path $InstallDir 'hesdor.exe'
+  # A running hesdor.exe can't be overwritten, but Windows lets it be renamed: move it aside and delete
+  # the copies set aside by earlier upgrades (one still running stays until the next upgrade).
+  Get-ChildItem -Path $InstallDir -Filter 'hesdor.exe.*.old' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+  if (Test-Path $exe) { Move-Item -Path $exe -Destination "$exe.$([Guid]::NewGuid().ToString('N')).old" }
+  Copy-Item -Force (Join-Path $tmp 'x\*') $InstallDir
   Write-Host "Installed $exe"
 
   if (-not $NoPath) {
