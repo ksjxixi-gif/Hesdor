@@ -96,9 +96,9 @@ export function mapFetchError(err: unknown, providerName: string): Error {
   return new ProviderError(msg, { kind: 'network' })
 }
 
-/** Join a base URL and path, tolerating a trailing slash on either side. */
+/** Join a base URL and path, tolerating a trailing slash and a pasted endpoint path (…/v1/chat/completions) on the base. */
 export function joinUrl(base: string, path: string): string {
-  const trimmed = base.endsWith('/') ? base.slice(0, -1) : base
+  const trimmed = base.replace(/\/+$/, '').replace(/\/(chat\/completions|responses|messages)$/, '')
   const suffix = trimmed.endsWith('/v1') && path.startsWith('/v1/') ? path.slice(3) : path
   return `${trimmed}${suffix}`
 }
