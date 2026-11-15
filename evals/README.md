@@ -1,6 +1,6 @@
 # Hesdor evals
 
-Two suites, following the evaluation methodology in the study report (section 9):
+Two suites:
 
 | Suite | What | Where | When |
 |---|---|---|---|
