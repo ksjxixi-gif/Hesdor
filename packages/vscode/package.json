@@ -52,7 +52,7 @@
       },
       {
         "command": "hesdor.cancel",
-        "title": "Cancel",
+        "title": "Stop",
         "category": "Hesdor",
         "icon": "$(debug-stop)"
       },
@@ -76,7 +76,7 @@
         },
         {
           "command": "hesdor.cancel",
-          "when": "view == hesdor.chat",
+          "when": "view == hesdor.chat && hesdor.busy",
           "group": "navigation"
         }
       ],
