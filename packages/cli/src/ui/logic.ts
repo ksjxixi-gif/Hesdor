@@ -187,7 +187,7 @@ export function turnNotice(result: Pick<TurnResult, 'status' | 'error' | 'errorK
   if (result.errorKind === 'quota_exhausted' && (providerId === 'chatgpt' || /ChatGPT plan/.test(result.error ?? ''))) {
     return { text: `Usage limit reached · ${plan.linkText}: ${plan.url}`, tone: 'error' }
   }
-  return { text: result.error ?? 'run failed', tone: 'error' }
+  return undefined // the run.failed event already showed the error
 }
 
 /** Final line of a /goal run. */
