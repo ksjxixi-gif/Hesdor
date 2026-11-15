@@ -8,11 +8,10 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 
 const log = $<HTMLElement>('log')
 const plan = $<HTMLElement>('plan')
-const mode = $<HTMLSelectElement>('mode')
+const optionsBox = $<HTMLElement>('options')
 const input = $<HTMLTextAreaElement>('input')
 const contextBox = $<HTMLElement>('context')
 const sendButton = $<HTMLButtonElement>('send')
-const cancelButton = $<HTMLButtonElement>('cancel')
 /** <details> the user opened, by item index, so a re-render keeps them open. */
 const open = new Set<number>()
 
@@ -99,18 +98,27 @@ function render(s: ViewState): void {
     plan.append(el('h2', undefined, 'Plan'), list)
   }
 
-  if (document.activeElement !== mode) {
-    mode.replaceChildren(...s.modes.map((m) => Object.assign(el('option', undefined, m.name), { value: m.id, title: m.description ?? '' })))
-    if (s.mode) mode.value = s.mode
-  }
-  mode.disabled = s.modes.length === 0
+  // Rebuilding a dropdown while it is open would close it.
+  if (!optionsBox.contains(document.activeElement)) optionsBox.replaceChildren(...s.options.flatMap(optionSelect))
 
   contextBox.replaceChildren()
   if (s.context.length > 0) {
     contextBox.append(el('span', 'chips', `Attached: ${s.context.join(', ')}`), button('Clear', () => send({ type: 'clearContext' })))
   }
   sendButton.disabled = s.busy
-  cancelButton.hidden = !s.busy
+}
+
+/** One agent setting (mode, model) as a labelled dropdown; groups are flattened. */
+function optionSelect(o: ViewState['options'][number]): HTMLSelectElement[] {
+  if (o.type !== 'select') return []
+  const select = el('select', o.category ?? undefined)
+  select.setAttribute('aria-label', o.name)
+  select.title = o.description ?? o.name
+  const choices = o.options.flatMap((c) => ('options' in c ? c.options : [c]))
+  select.append(...choices.map((c) => Object.assign(el('option', undefined, c.name), { value: c.value, title: c.description ?? '' })))
+  select.value = o.currentValue
+  select.addEventListener('change', () => send({ type: 'setOption', configId: o.id, value: select.value }))
+  return [select]
 }
 
 function submit(): void {
@@ -127,13 +135,9 @@ input.addEventListener('keydown', (e) => {
     submit()
   }
 })
-cancelButton.addEventListener('click', () => send({ type: 'cancel' }))
-$<HTMLButtonElement>('new').addEventListener('click', () => {
-  open.clear()
-  send({ type: 'newSession' })
-})
-mode.addEventListener('change', () => send({ type: 'setMode', modeId: mode.value }))
 window.addEventListener('message', (e: MessageEvent<ToView>) => {
-  if (e.data?.type === 'state') render(e.data.state)
+  if (e.data?.type !== 'state') return
+  if (e.data.state.items.length === 0) open.clear() // a new session
+  render(e.data.state)
 })
 send({ type: 'ready' })
