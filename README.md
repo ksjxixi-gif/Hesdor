@@ -18,7 +18,7 @@
 
 ## Why Hesdor
 
-- **Any model, any vendor.** 77 provider presets over three wire formats, any OpenAI- or Anthropic-compatible endpoint, local servers like Ollama, LM Studio, llama.cpp and vLLM, and your ChatGPT plan. Mix vendors with [model roles](docs/roles.md).
+- **Any model, any vendor.** 77 provider presets over three wire formats, any OpenAI- or Anthropic-compatible endpoint, local servers like Ollama, LM Studio, llama.cpp and vLLM, your ChatGPT plan, and your Claude plan through your own Claude Code. Mix vendors with [model roles](docs/roles.md).
 - **You see what it costs.** Every request is priced from a bundled models.dev catalog, cache tokens included. The TUI shows session cost and cache hit rate, and `--max-budget-usd` stops a run at your limit.
 - **Local-first.** Tools run on your machine, not in a hosted sandbox. Sessions, checkpoints and keys stay in your config directory. Prompts go only to the provider you configure.
 - **No telemetry.** None. The only call home is an optional once-a-day version check, off in CI and headless runs.
@@ -60,7 +60,7 @@ hesdor run "Fix the failing test"           # full agent: read + edit + execute
 hesdor review                               # review your branch: P0-P3 findings
 ```
 
-Using a ChatGPT plan instead of an API key: `hesdor login chatgpt`, then `hesdor -p chatgpt`. Fully local: `hesdor -p ollama -m qwen2.5-coder:7b`.
+Using a ChatGPT plan instead of an API key: `hesdor login chatgpt`, then `hesdor -p chatgpt`. A Claude plan: sign in to Claude Code (`claude auth login`), then `hesdor -p claude-code` runs your Claude Code inside Hesdor ([details](docs/subscriptions.md#claude-code)). Fully local: `hesdor -p ollama -m qwen2.5-coder:7b`.
 
 ## What it does
 
