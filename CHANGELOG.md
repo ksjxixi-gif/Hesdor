@@ -5,6 +5,14 @@ All notable changes to Hesdor are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions refer to
 the published CLI package (`packages/cli`).
 
+## [Unreleased]
+
+### Fixed
+
+- A base URL pasted with its endpoint path (`https://host/v1/chat/completions`, `…/responses`, `…/messages`) no longer doubles the path into a 404; model listing works with it too.
+- `hesdor setup` asks for a custom provider's name in plain words and refuses an all-digit name, which read as a menu number.
+- The TUI shows a failed turn's error once instead of twice, and Tab no longer logs a `mode →` line per press (the footer shows the mode).
+
 ## [0.3.0] - 2026-11-15
 
 Released as standalone binaries on GitHub only. The npm package `@dean_overlord/hesdor` stays at 0.1.0 for now, so the update check (which reads npm) does not announce this version.
