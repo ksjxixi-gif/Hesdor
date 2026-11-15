@@ -6,8 +6,10 @@ import * as acp from '@agentclientprotocol/sdk'
 import { registerMcpServers, stopAllJobs } from '@hesdor/agent-core'
 import type { McpServerConfig, ToolContext } from '@hesdor/agent-core'
 import type { AgentMode, ChatMessage, ModelProvider } from '@hesdor/protocol'
+import { fetchModels } from '@hesdor/providers'
 import { VERSION } from './args.js'
 import type { CliFlags } from './args.js'
+import { modelIdError, saveConfig } from './config.js'
 import { loadEffectiveConfig, loadManagedSettings, providerBlocked } from './config-layers.js'
 import { createSelectedProvider, resolveSelection } from './provider-setup.js'
 import { resolveRoles } from './roles.js'
@@ -58,6 +60,10 @@ interface AcpSession {
   session: Session
   extraMcp: Awaited<ReturnType<typeof registerMcpServers>>
   provider: ModelProvider
+  /** The selected provider id and model, and the models it offers (unset with a test provider). */
+  providerId?: string
+  model?: string
+  models?: string[]
   /** Resolved once per session: the guardian's breaker state lives in it. */
   roles?: Roles
   providerFor?: (model: string) => Promise<ModelProvider>
@@ -92,8 +98,20 @@ function modeOption(mode: AgentMode): acp.SessionConfigOption {
   }
 }
 
+/** The model picker; the current model stays listed even when the provider's catalog lacks it. */
+function modelOption(s: AcpSession): acp.SessionConfigOption | undefined {
+  if (!s.model) return undefined
+  const ids = [...new Set([s.model, ...(s.models ?? [])])]
+  return { id: 'model', name: 'Model', category: 'model', type: 'select', currentValue: s.model, options: ids.map((id) => ({ value: id, name: id })) }
+}
+
+function configOptions(s: AcpSession): acp.SessionConfigOption[] {
+  const model = modelOption(s)
+  return model ? [modeOption(s.mode), model] : [modeOption(s.mode)]
+}
+
 function modeState(s: AcpSession): Pick<acp.NewSessionResponse, 'modes' | 'configOptions'> {
-  return { modes: { currentModeId: s.mode, availableModes: MODES }, configOptions: [modeOption(s.mode)] }
+  return { modes: { currentModeId: s.mode, availableModes: MODES }, configOptions: configOptions(s) }
 }
 
 function isMode(value: unknown): value is AgentMode {
@@ -131,9 +149,12 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
   let clientFs: acp.FileSystemCapabilities | undefined
   const log = (m: string): void => console.error(`hesdor acp: ${m}`)
 
-  async function selection() {
+  /** Model catalogs by provider id, fetched once per process; a failed fetch lists only the current model. */
+  const catalogs = new Map<string, Promise<string[]>>()
+
+  async function selection(model?: string) {
     // No workspace yet, so no project layer here; managed settings still apply.
-    const eff = await loadEffectiveConfig(flags)
+    const eff = await loadEffectiveConfig(model ? { ...flags, model } : flags)
     const sel = await resolveSelection(eff.flags, eff.config)
     const blocked = providerBlocked(eff.managed, sel.providerId)
     if (blocked) throw acp.RequestError.invalidParams(undefined, blocked)
@@ -142,13 +163,40 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
   }
 
   /** The main model plus roles (fallback, escalation, guardian, small, subagent), as the TUI resolves them. */
-  async function models(warn: (m: string) => void): Promise<Pick<AcpSession, 'provider' | 'roles' | 'providerFor'>> {
+  async function models(
+    warn: (m: string) => void,
+    model?: string,
+  ): Promise<Pick<AcpSession, 'provider' | 'roles' | 'providerFor' | 'providerId' | 'model' | 'models'>> {
     if (deps.provider) return { provider: deps.provider, ...(deps.roles ? { roles: deps.roles } : {}) }
-    const { eff, sel } = await selection()
+    const { eff, sel } = await selection(model)
     // Not headless: a person in the editor answers what the guardian declines, as in the TUI.
     const roles = await resolveRoles(eff.flags, eff.config, sel)
     for (const w of roles.warnings) warn(w)
-    return { provider: createSelectedProvider(sel), roles, providerFor: agentProviderFor(eff.flags, eff.config, sel) }
+    let catalog = catalogs.get(sel.providerId)
+    if (!catalog) {
+      // Same resolution as the TUI's model picker: endpoint, key, and a custom provider's authHeader / apiKeyCommand.
+      catalog = fetchModels({
+        provider: sel.providerId,
+        customKind: sel.kind,
+        ...(sel.baseUrl ? { baseUrl: sel.baseUrl } : {}),
+        ...(sel.apiKey ? { apiKey: sel.apiKey } : {}),
+        ...(sel.custom?.apiKeyCommand ? { apiKeyCommand: sel.custom.apiKeyCommand } : {}),
+        ...(sel.custom?.authHeader ? { authHeader: sel.custom.authHeader } : {}),
+      }).catch((err: unknown) => {
+        log(`model list for ${sel.providerId}: ${err instanceof Error ? err.message : String(err)}`)
+        catalogs.delete(sel.providerId) // try again with the next session
+        return []
+      })
+      catalogs.set(sel.providerId, catalog)
+    }
+    return {
+      provider: createSelectedProvider(sel),
+      roles,
+      providerFor: agentProviderFor(eff.flags, eff.config, sel),
+      providerId: sel.providerId,
+      model: sel.model,
+      models: await catalog,
+    }
   }
 
   async function open(
@@ -268,13 +316,22 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
       s.mode = params.modeId
       return {}
     })
-    .onRequest('session/set_config_option', ({ params }) => {
+    .onRequest('session/set_config_option', async ({ params }) => {
       const s = get(params.sessionId)
-      if (params.configId !== 'mode' || !isMode(params.value)) {
-        throw acp.RequestError.invalidParams(undefined, `unknown config option ${params.configId}=${String(params.value)}`)
+      if (params.configId === 'mode' && isMode(params.value)) {
+        s.mode = params.value
+        return { configOptions: configOptions(s) }
       }
-      s.mode = params.value
-      return { configOptions: [modeOption(s.mode)] }
+      if (params.configId === 'model' && typeof params.value === 'string' && s.providerId) {
+        const problem = modelIdError(params.value)
+        if (problem) throw acp.RequestError.invalidParams(undefined, problem)
+        if (s.controller) throw acp.RequestError.invalidRequest(undefined, 'wait for the running prompt to finish before switching models')
+        Object.assign(s, await models((m) => s.notices.push(m), params.value))
+        // Remembered per provider, like the TUI's /model, so the next session starts on it.
+        await saveConfig({ models: { [s.providerId]: params.value } })
+        return { configOptions: configOptions(s) }
+      }
+      throw acp.RequestError.invalidParams(undefined, `unknown config option ${params.configId}=${String(params.value)}`)
     })
     .onNotification('session/cancel', ({ params }) => {
       sessions.get(params.sessionId)?.controller?.abort()
