@@ -190,7 +190,7 @@ describe('turnNotice / goalNotice', () => {
   it('turns a ChatGPT plan quota error into "Usage limit reached" with the manage-usage link', () => {
     const n = turnNotice({ status: 'failed', error: 'ChatGPT plan usage limit reached', errorKind: 'quota_exhausted' }, 'chatgpt')
     expect(n?.text).toMatch(/^Usage limit reached · Manage usage: https:\/\//)
-    expect(turnNotice({ status: 'failed', error: 'billing', errorKind: 'quota_exhausted' }, 'openai')?.text).toBe('billing')
+    expect(turnNotice({ status: 'failed', error: 'billing', errorKind: 'quota_exhausted' }, 'openai')).toBeUndefined() // shown once, by run.failed
     expect(turnNotice({ status: 'completed' }, 'openai')).toBeUndefined()
     expect(turnNotice({ status: 'budget_exceeded' }, 'openai', 2)?.text).toMatch(/\$2/)
   })
