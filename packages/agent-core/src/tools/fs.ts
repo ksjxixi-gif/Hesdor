@@ -49,14 +49,25 @@ function cleanOptional(value: string | undefined): string | undefined {
 
 const MAX_SNAPSHOTS = 50
 
-/** Prior file bytes (binary-safe for /undo), or null when the file does not exist. */
-export async function readBefore(abs: string): Promise<Buffer | null> {
+/**
+ * Prior file bytes (binary-safe for /undo), or null when the file does not exist. With `ctx.editorFs`,
+ * a text file's bytes are the editor's buffer, unsaved edits included.
+ */
+export async function readBefore(abs: string, ctx?: ToolContext): Promise<Buffer | null> {
+  let disk: Buffer
   try {
-    return await readFile(abs)
+    disk = await readFile(abs)
   } catch (err) {
     if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'ENOENT') return null
     throw err
   }
+  if (!ctx?.editorFs || disk.subarray(0, 8192).includes(0)) return disk
+  return Buffer.from(await ctx.editorFs.readTextFile(abs), 'utf8')
+}
+
+/** Write a text file through the host editor when it offers that (ctx.editorFs), else to disk. */
+export async function writeText(ctx: ToolContext, abs: string, content: string): Promise<void> {
+  await (ctx.editorFs ? ctx.editorFs.writeTextFile(abs, content) : writeFile(abs, content, 'utf8'))
 }
 
 export const BOM = '﻿'
@@ -103,7 +114,7 @@ export async function requireApproved(
   if (!approved) {
     throw new PermissionDeniedError(`the user rejected the change to ${relPath}`)
   }
-  const now = await readBefore(abs)
+  const now = await readBefore(abs, ctx)
   if (now === null || before === null ? now !== before : !now.equals(before)) {
     throw new Error(`the file changed while it was being reviewed: ${relPath}`)
   }
@@ -225,7 +236,7 @@ async function readOne(
       `"${relPath}" is ${(info.size / 1024 / 1024).toFixed(1)} MB, too large for read_file; use search_files to find the lines you need`,
     )
   }
-  const buf = await readFile(abs)
+  const buf = (await readBefore(abs, ctx)) ?? Buffer.alloc(0)
   const rel = toRel(ctx.root, abs)
   if (buf.subarray(0, 8192).includes(0)) {
     return { path: rel, binary: true, bytes: info.size, totalLines: 0, offset: 1, content: '(binary file, not shown)', truncated: false }
@@ -312,7 +323,7 @@ export const writeFileTool = defineTool({
   async execute(input, ctx: ToolContext) {
     const abs = safeResolve(ctx.root, input.path)
     assertWritable(ctx.root, abs)
-    const before = await readBefore(abs)
+    const before = await readBefore(abs, ctx)
     // Overwriting a CRLF/BOM file keeps its format so the edit does not churn every line; new files are written as given.
     const format = before === null ? null : fileFormat(before.toString('utf8'))
     const content =
@@ -322,7 +333,7 @@ export const writeFileTool = defineTool({
     await requireApproved(ctx, abs, toRel(ctx.root, abs), before, content)
     await mkdir(path.dirname(abs), { recursive: true })
     // Format and lint after the write; the snapshot keeps the pre-edit bytes, so /undo restores those.
-    const checked = await writeWithChecks(ctx, abs, () => writeFile(abs, content, 'utf8'))
+    const checked = await writeWithChecks(ctx, abs, () => writeText(ctx, abs, content))
     await recordStamp(ctx, abs)
     pushSnapshot(ctx, abs, before)
     ctx.emit({ type: 'file.changed', path: toRel(ctx.root, abs), op: 'write' })
@@ -338,7 +349,7 @@ export const deleteFileTool = defineTool({
   async execute(input, ctx) {
     const abs = safeResolve(ctx.root, input.path)
     assertWritable(ctx.root, abs)
-    const before = await readBefore(abs)
+    const before = await readBefore(abs, ctx)
     if (before === null) throw new Error(`"${input.path}" does not exist`)
     await requireApproved(ctx, abs, toRel(ctx.root, abs), before, null)
     await unlink(abs)
@@ -371,7 +382,8 @@ export const applyPatchTool = defineTool({
     const abs = safeResolve(ctx.root, input.path)
     assertWritable(ctx.root, abs)
     await assertFresh(ctx, abs, input.path)
-    const originalBytes = await readFile(abs)
+    const originalBytes = await readBefore(abs, ctx)
+    if (originalBytes === null) throw new Error(`"${input.path}" does not exist`)
     const original = originalBytes.toString('utf8')
     // read_file shows LF without the BOM, so match on that view and restore the file's own format on write.
     const format = fileFormat(original)
@@ -403,7 +415,7 @@ export const applyPatchTool = defineTool({
     }
     updated = applyFormat(updated, format)
     await requireApproved(ctx, abs, toRel(ctx.root, abs), originalBytes, updated)
-    const checked = await writeWithChecks(ctx, abs, () => writeFile(abs, updated, 'utf8'))
+    const checked = await writeWithChecks(ctx, abs, () => writeText(ctx, abs, updated))
     await recordStamp(ctx, abs)
     pushSnapshot(ctx, abs, originalBytes)
     ctx.emit({ type: 'file.changed', path: toRel(ctx.root, abs), op: 'write' })

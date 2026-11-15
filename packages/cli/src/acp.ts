@@ -1,3 +1,4 @@
+import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
@@ -126,6 +127,8 @@ function clientMcpServers(servers: acp.McpServer[], warn: (m: string) => void): 
 export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentApp {
   // No markHeadless(): a person types each ACP prompt in their editor, which interactive-only plans allow.
   const sessions = new Map<string, AcpSession>()
+  // What the editor said it can do with files (initialize); read and write are used separately.
+  let clientFs: acp.FileSystemCapabilities | undefined
   const log = (m: string): void => console.error(`hesdor acp: ${m}`)
 
   async function selection() {
@@ -211,22 +214,25 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
         sessions.clear()
       })
     })
-    .onRequest('initialize', ({ params }) => ({
-      protocolVersion: acp.PROTOCOL_VERSION,
-      agentInfo: { name: 'hesdor', title: 'Hesdor', version: VERSION },
-      agentCapabilities: {
-        loadSession: true,
-        promptCapabilities: { embeddedContext: true },
-        mcpCapabilities: { http: true },
-      },
-      // Hesdor reads provider keys from env or `hesdor setup`; these methods point the user there.
-      authMethods: [
-        { id: 'hesdor-setup', name: 'Configure a provider key', description: SETUP_HINT },
-        ...(params.clientCapabilities?.auth?.terminal
-          ? [{ type: 'terminal' as const, id: 'hesdor-setup-terminal', name: 'Run hesdor setup', description: 'Choose a provider and save its API key', args: ['setup'] }]
-          : []),
-      ],
-    }))
+    .onRequest('initialize', ({ params }) => {
+      clientFs = params.clientCapabilities?.fs ?? undefined
+      return {
+        protocolVersion: acp.PROTOCOL_VERSION,
+        agentInfo: { name: 'hesdor', title: 'Hesdor', version: VERSION },
+        agentCapabilities: {
+          loadSession: true,
+          promptCapabilities: { embeddedContext: true },
+          mcpCapabilities: { http: true },
+        },
+        // Hesdor reads provider keys from env or `hesdor setup`; these methods point the user there.
+        authMethods: [
+          { id: 'hesdor-setup', name: 'Configure a provider key', description: SETUP_HINT },
+          ...(params.clientCapabilities?.auth?.terminal
+            ? [{ type: 'terminal' as const, id: 'hesdor-setup-terminal', name: 'Run hesdor setup', description: 'Choose a provider and save its API key', args: ['setup'] }]
+            : []),
+        ],
+      }
+    })
     .onRequest('authenticate', async () => {
       if (!deps.provider) await selection() // throws auth_required while no key is configured
       return {}
@@ -418,6 +424,19 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
         }
       }
 
+      // Files open in the editor: read unsaved text and write into its buffer (undo works there).
+      const editorFs: ToolContext['editorFs'] =
+        clientFs?.readTextFile || clientFs?.writeTextFile
+          ? {
+              readTextFile: async (abs) =>
+                clientFs?.readTextFile ? (await client.request('fs/read_text_file', { sessionId: s.id, path: abs })).content : readFile(abs, 'utf8'),
+              writeTextFile: async (abs, content) => {
+                if (clientFs?.writeTextFile) await client.request('fs/write_text_file', { sessionId: s.id, path: abs, content })
+                else await writeFile(abs, content, 'utf8')
+              },
+            }
+          : undefined
+
       try {
         const result = await runTurn({
           trustWorkspace: flags.trustWorkspace,
@@ -434,6 +453,7 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
           requestApproval,
           approvalsEnabled: true,
           reviewChange,
+          ...(editorFs ? { editorFs } : {}),
           state: s.state,
           sessionId: s.id,
           ...(s.roles ? { roles: s.roles } : {}),

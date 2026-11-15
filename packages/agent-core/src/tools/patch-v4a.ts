@@ -3,7 +3,7 @@ import path from 'node:path'
 import { z } from 'zod'
 import { assertWritable, safeResolve, toRel } from '../paths.js'
 import type { ToolContext } from '../context.js'
-import { applyFormat, assertFresh, fileFormat, pushSnapshot, readBefore, recordStamp, requireApproved, toLf } from './fs.js'
+import { applyFormat, assertFresh, fileFormat, pushSnapshot, readBefore, recordStamp, requireApproved, toLf, writeText } from './fs.js'
 import { checkAfter, checkBefore } from '../checks.js'
 import { defineTool } from './types.js'
 
@@ -192,12 +192,12 @@ async function applyV4A(ctx: ToolContext, patch: string): Promise<string> {
   for (const op of ops) {
     const { abs, rel } = target(op.path)
     if (op.type === 'add') {
-      if ((await readBefore(abs)) !== null) throw new PatchError(`${rel} already exists; use "*** Update File: ${rel}"`, rel)
+      if ((await readBefore(abs, ctx)) !== null) throw new PatchError(`${rel} already exists; use "*** Update File: ${rel}"`, rel)
       writes.push({ abs, rel, before: null, after: op.lines.length > 0 ? `${op.lines.join('\n')}\n` : '' })
       continue
     }
     await assertFresh(ctx, abs, rel)
-    const before = await readBefore(abs)
+    const before = await readBefore(abs, ctx)
     if (before === null) throw new PatchError(`${rel} does not exist`, rel)
     if (op.type === 'delete') {
       writes.push({ abs, rel, before, after: null })
@@ -214,13 +214,13 @@ async function applyV4A(ctx: ToolContext, patch: string): Promise<string> {
       continue
     }
     const dest = target(op.moveTo)
-    if ((await readBefore(dest.abs)) !== null) throw new PatchError(`cannot move ${rel} to ${dest.rel}: it already exists`, rel)
+    if ((await readBefore(dest.abs, ctx)) !== null) throw new PatchError(`cannot move ${rel} to ${dest.rel}: it already exists`, rel)
     writes.push({ ...dest, before: null, after: updated }, { abs, rel, before, after: null })
   }
 
   for (const w of writes) await requireApproved(ctx, w.abs, w.rel, w.before, w.after)
   for (const w of writes) {
-    if (!sameBytes(await readBefore(w.abs), w.before)) throw new Error(`${w.rel} changed while the patch was being reviewed; nothing was written`)
+    if (!sameBytes(await readBefore(w.abs, ctx), w.before)) throw new Error(`${w.rel} changed while the patch was being reviewed; nothing was written`)
   }
 
   // Post-edit checks (checks.ts): lint baselines now, format and lint after the write.
@@ -231,7 +231,7 @@ async function applyV4A(ctx: ToolContext, patch: string): Promise<string> {
       if (w.after === null) await unlink(w.abs)
       else {
         await mkdir(path.dirname(w.abs), { recursive: true })
-        await writeFile(w.abs, w.after, 'utf8')
+        await writeText(ctx, w.abs, w.after)
       }
       done.push(w)
     }

@@ -115,3 +115,38 @@ describe('read_file limits', () => {
     await expect(run('read_file', { path: 'big.log' }, ctx)).rejects.toThrow(/too large for read_file/)
   })
 })
+
+describe('editorFs (ACP client file access)', () => {
+  /** Editor buffers by absolute path; writes land here, never on disk. */
+  function withEditor(files: Record<string, string | Buffer>, buffers: Record<string, string>) {
+    const { ctx, root } = setup(files)
+    const open = new Map(Object.entries(buffers).map(([name, text]) => [path.join(root, name), text]))
+    const reads: string[] = []
+    ctx.editorFs = {
+      readTextFile: async (abs) => {
+        reads.push(abs)
+        return open.get(abs) ?? readFileSync(abs, 'utf8')
+      },
+      writeTextFile: async (abs, content) => {
+        open.set(abs, content)
+      },
+    }
+    return { ctx, root, open, reads }
+  }
+
+  it('reads unsaved buffer text and patches it in the editor, leaving the disk alone', async () => {
+    const { ctx, root, open } = withEditor({ 'a.ts': 'const a = 1\n' }, { 'a.ts': 'const a = 2\n' })
+    expect((await run('read_file', { path: 'a.ts' }, ctx)).content).toBe('const a = 2')
+    await run('apply_patch', { path: 'a.ts', edits: [{ find: 'const a = 2', replace: 'const a = 3' }] }, ctx)
+    expect(open.get(path.join(root, 'a.ts'))).toBe('const a = 3\n')
+    expect(readFileSync(path.join(root, 'a.ts'), 'utf8')).toBe('const a = 1\n')
+    await run('write_file', { path: 'a.ts', content: 'new\n' }, ctx)
+    expect(open.get(path.join(root, 'a.ts'))).toBe('new\n')
+  })
+
+  it('keeps binary files on disk', async () => {
+    const { ctx, reads } = withEditor({ 'b.bin': Buffer.from([1, 0, 2]) }, {})
+    expect((await run('read_file', { path: 'b.bin' }, ctx)).binary).toBe(true)
+    expect(reads).toEqual([])
+  })
+})

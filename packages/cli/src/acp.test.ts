@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -199,5 +199,31 @@ describe('hesdor acp', () => {
         { type: 'resource', resource: { uri: 'file:///x.ts', text: 'code' } },
       ]),
     ).toBe('see\n<context uri="file:///x.ts">\ncode\n</context>')
+  })
+
+  it('reads and writes through the client when it advertises fs', async () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), 'hesdor-acp-'))
+    const file = path.join(cwd, 'a.txt')
+    writeFileSync(file, 'on disk\n')
+    const buffers = new Map([[file, 'unsaved edit\n']])
+    const provider = new ScriptedProvider([
+      call('c1', 'apply_patch', { path: 'a.txt', edits: [{ find: 'unsaved edit', replace: 'patched' }] }),
+      answer('done'),
+    ])
+    const client = acp
+      .client()
+      .onRequest('session/request_permission', () => ({ outcome: { outcome: 'selected', optionId: 'allow_once' } }))
+      .onRequest('fs/read_text_file', ({ params }) => ({ content: buffers.get(params.path) ?? readFileSync(params.path, 'utf8') }))
+      .onRequest('fs/write_text_file', ({ params }) => {
+        buffers.set(params.path, params.content)
+      })
+    const stop = await client.connectWith(createAcpAgent(flags, { provider }), async (ctx) => {
+      await ctx.request('initialize', { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: { fs: { readTextFile: true, writeTextFile: true } } })
+      const { sessionId } = await ctx.request('session/new', { cwd, mcpServers: [] })
+      return ctx.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: 'patch a.txt' }] })
+    })
+    expect(stop.stopReason).toBe('end_turn')
+    expect(buffers.get(file)).toBe('patched\n')
+    expect(readFileSync(file, 'utf8')).toBe('on disk\n')
   })
 })
