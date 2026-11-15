@@ -7,12 +7,18 @@ the published CLI package (`packages/cli`).
 
 ## [Unreleased]
 
+### Added
+
+- Model picker in editors: `hesdor acp` offers a `model` session option listing the provider's models (from its `/models` endpoint), and switching it saves the choice for that provider like `/model`. The VS Code extension shows the mode and model menus under the message box and starts the session when the view opens, so a missing key shows up right away.
+
 ### Fixed
+
+- Provider errors show the provider's own message from a JSON error body instead of the raw JSON.
 
 - A base URL pasted with its endpoint path (`https://host/v1/chat/completions`, `…/responses`, `…/messages`) no longer doubles the path into a 404; model listing works with it too.
 - `hesdor setup` asks for a custom provider's name in plain words and refuses an all-digit name, which read as a menu number.
 - The TUI shows a failed turn's error once instead of twice, and Tab no longer logs a `mode →` line per press (the footer shows the mode).
-- VS Code extension: long errors wrap instead of scrolling sideways, your messages show as bubbles, the message box grows as you type, and Stop appears only while a turn runs.
+- VS Code extension: long errors wrap instead of scrolling sideways, your messages show as bubbles, the message box grows as you type, and the view's Stop button appears only while a turn runs (New and Stop live in the view's title bar only).
 
 ## [0.3.0] - 2026-11-15
 
