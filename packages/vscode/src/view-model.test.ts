@@ -45,11 +45,13 @@ describe('applyUpdate', () => {
 
   it('keeps the plan, mode and notices', () => {
     const s = initialState()
+    const mode = { id: 'mode', name: 'Mode', type: 'select' as const, currentValue: 'build', options: [{ value: 'build', name: 'Build' }, { value: 'plan', name: 'Plan' }] }
+    applyUpdate(s, { sessionUpdate: 'config_option_update', configOptions: [mode, { ...mode, id: 'model', name: 'Model', currentValue: 'a' }] })
     applyUpdate(s, { sessionUpdate: 'plan', entries: [{ content: 'test', priority: 'medium', status: 'pending' }] })
     applyUpdate(s, { sessionUpdate: 'current_mode_update', currentModeId: 'plan' })
     applyUpdate(s, { sessionUpdate: 'notice', severity: 'warning', title: 'Hesdor', description: 'fallback' })
     expect(s.plan).toHaveLength(1)
-    expect(s.mode).toBe('plan')
+    expect(s.options.map((o) => o.currentValue)).toEqual(['plan', 'a'])
     expect(s.items).toEqual([{ kind: 'notice', severity: 'warning', text: 'Hesdor: fallback' }])
   })
 })
