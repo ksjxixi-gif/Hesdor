@@ -5,6 +5,12 @@ All notable changes to Hesdor are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions refer to
 the published CLI package (`packages/cli`).
 
+## [Unreleased]
+
+### Added
+
+- `claude-code` provider: use your Claude plan through your own signed-in Claude Code. Each turn runs `claude -p` in the workspace and Hesdor shows its answer, tool calls, file changes and plan in the TUI, headless runs and editors; later turns continue the same Claude Code conversation. Hesdor never touches a Claude credential, and Claude Code's own tools and permission settings apply. See docs/subscriptions.md.
+
 ## [0.3.1] - 2026-11-15
 
 ### Added
