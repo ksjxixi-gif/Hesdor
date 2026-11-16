@@ -1,14 +1,28 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { RunEvent } from '@hesdor/protocol'
-import { claudeCodeArgs, createTranslator, toolSummary } from './claude-code.js'
+import { claudeCodeArgs, conversationId, createTranslator, toolSummary, wrongConversationFlag } from './claude-code.js'
 
 const root = path.resolve('/repo')
 
 describe('claude-code', () => {
   it('maps Hesdor modes and models to claude -p flags', () => {
     expect(claudeCodeArgs('build', 'default')).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', 'acceptEdits'])
-    expect(claudeCodeArgs('ask', 'sonnet', 'abc').slice(-5)).toEqual(['plan', '--model', 'sonnet', '--resume', 'abc'])
+    expect(claudeCodeArgs('ask', 'sonnet', { id: 'abc', resume: true }).slice(-5)).toEqual(['plan', '--model', 'sonnet', '--resume', 'abc'])
+    expect(claudeCodeArgs('build', 'default', { id: 'abc', resume: false }).slice(-2)).toEqual(['--session-id', 'abc'])
+  })
+
+  it('derives one stable Claude Code conversation UUID per Hesdor session', () => {
+    const id = conversationId('mhx1-abc123')
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(conversationId('mhx1-abc123')).toBe(id)
+    expect(conversationId('mhx1-abc124')).not.toBe(id)
+  })
+
+  it('spots a --resume or --session-id that Claude Code refused', () => {
+    expect(wrongConversationFlag('No conversation found with session ID: 6f1c')).toBe(true)
+    expect(wrongConversationFlag('Error: Session ID 6f1c-0002 is already in use.')).toBe(true)
+    expect(wrongConversationFlag('Invalid API key')).toBe(false)
   })
 
   it('summarizes a tool call by its main input, relative to the workspace', () => {
