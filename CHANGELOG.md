@@ -5,6 +5,12 @@ All notable changes to Hesdor are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Versions refer to
 the published CLI package (`packages/cli`).
 
+## [Unreleased]
+
+### Added
+
+- `claude-code` provider: a resumed Hesdor session (`-c`, `-r`, `/sessions`) continues its Claude Code conversation after a restart instead of starting a new one.
+
 ## [0.3.2] - 2026-11-15
 
 ### Added
