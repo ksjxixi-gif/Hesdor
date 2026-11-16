@@ -18,7 +18,8 @@ describe('update check', () => {
   it('shows nothing on first start, fetches in the background, notifies on the next start', async () => {
     const fetchMock = okFetch('0.2.0')
     expect(await updateNotice({}, { ...opts, fetch: fetchMock, now: 1_000 })).toBeNull()
-    await settle()
+    // Wait for the background refresh to land in the cache; a fixed sleep raced it on slow CI runners.
+    await vi.waitFor(async () => expect((await readUpdateCache())?.latest).toBe('0.2.0'))
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]!
     expect(url).toBe('https://registry.npmjs.org/@dean_overlord/hesdor/latest')
@@ -26,8 +27,7 @@ describe('update check', () => {
     expect(await updateNotice({}, { ...opts, fetch: fetchMock, now: 2_000 })).toContain('0.2.0 is available')
     expect(fetchMock).toHaveBeenCalledTimes(1) // cached for 24 h
     await updateNotice({}, { ...opts, fetch: fetchMock, now: 1_000 + DAY })
-    await settle()
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2))
   })
 
   it('stays quiet when up to date', async () => {
