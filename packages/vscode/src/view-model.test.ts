@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import type * as acp from '@agentclientprotocol/sdk'
-import { addPermission, answerPermission, applyUpdate, initialState, permissionResponse } from './view-model.js'
+import { addPermission, answerPermission, applyUpdate, initialState, permissionResponse, sessionPick } from './view-model.js'
 
 const text = (t: string): acp.ContentBlock => ({ type: 'text', text: t })
+
+describe('sessionPick', () => {
+  it('shows a saved session by title and age', () => {
+    const now = Date.parse('2026-11-16T12:00:00Z')
+    const row = (updatedAt: string | null, title = 'Fix the login bug') => sessionPick({ sessionId: 's1', cwd: '/r', title, updatedAt }, now)
+    expect(row('2026-11-16T11:59:50Z')).toEqual({ label: 'Fix the login bug', description: 'just now', sessionId: 's1' })
+    expect(row('2026-11-16T11:15:00Z').description).toBe('45 min ago')
+    expect(row('2026-11-16T07:00:00Z').description).toBe('5 h ago')
+    expect(row('2026-11-13T12:00:00Z').description).toBe('3 d ago')
+    expect(row(null, '').label).toBe('(untitled)')
+    expect(row(null).description).toBe('')
+  })
+})
 
 describe('applyUpdate', () => {
   it('joins streamed chunks per kind and starts a new item when the kind changes', () => {
