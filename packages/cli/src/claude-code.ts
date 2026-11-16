@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { createInterface } from 'node:readline'
-import type { AgentMode, RunEvent, TodoItem, Usage } from '@hesdor/protocol'
+import type { AgentMode, ChatImage, RunEvent, TodoItem, Usage } from '@hesdor/protocol'
 import type { TurnOptions, TurnResult } from './run.js'
 
 /**
@@ -24,10 +24,20 @@ export type Conversation = { id: string; resume: boolean }
 
 export function claudeCodeArgs(mode: AgentMode, model: string, conversation?: Conversation): string[] {
   // build may edit files; plan and ask stay read-only. Commands follow the user's Claude Code permission rules.
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', mode === 'build' ? 'acceptEdits' : 'plan']
+  const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', mode === 'build' ? 'acceptEdits' : 'plan']
   if (model && model !== 'default') args.push('--model', model)
   if (conversation) args.push(conversation.resume ? '--resume' : '--session-id', conversation.id)
   return args
+}
+
+/** The prompt as Claude Code's stream-json input: one user message line, with any attached images. */
+export function userMessage(prompt: string, images: ChatImage[] = []): string {
+  // Images first, then the question (the order Anthropic's vision guide recommends).
+  const content = [
+    ...images.map((i) => ({ type: 'image', source: { type: 'base64', media_type: i.mediaType, data: i.data } })),
+    { type: 'text', text: prompt },
+  ]
+  return `${JSON.stringify({ type: 'user', message: { role: 'user', content } })}\n`
 }
 
 /** Claude Code refused the conversation flag: `--resume` of one it never saw, or `--session-id` of one it has. */
@@ -133,7 +143,7 @@ export async function runClaudeCodeTurn(opts: TurnOptions): Promise<TurnResult> 
       steps: 0,
       ...r,
       text,
-      messages: [...history, { role: 'user', content: opts.prompt }, ...(text ? [{ role: 'assistant' as const, content: text }] : [])],
+      messages: [...history, { role: 'user', content: opts.prompt, ...(opts.images?.length ? { images: opts.images } : {}) }, ...(text ? [{ role: 'assistant' as const, content: text }] : [])],
     }
   }
 
@@ -158,7 +168,7 @@ export async function runClaudeCodeTurn(opts: TurnOptions): Promise<TurnResult> 
         opts.signal.removeEventListener('abort', abort)
         resolve({ code })
       })
-      child.stdin.end(opts.prompt)
+      child.stdin.end(userMessage(opts.prompt, opts.images))
     })
     return { exit, stderr, state }
   }
