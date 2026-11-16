@@ -18,7 +18,7 @@ Hesdor uses a subscription only where the vendor allows third-party, locally run
 With `--provider claude-code` (or `hesdor setup` → Claude Code, or `/provider claude-code`), each turn runs your installed, signed-in `claude` in headless mode (`claude -p`) in the workspace, and Hesdor shows its answer, tool calls, file changes and plan in the TUI, headless output and editors. Hesdor never reads or stores a Claude credential; usage counts against the plan you signed in to Claude Code with. Later turns of the same Hesdor session continue the same Claude Code conversation, also after a restart (`-c`, `-r`, `/sessions`).
 
 - Models: `default` (Claude Code's choice), `opus`, `sonnet`, `haiku`.
-- Modes: build lets Claude Code edit files; plan and ask are read-only. Commands run only when your Claude Code permission settings allow them, because nobody is there to approve them; Hesdor reports what was denied.
+- Modes: build lets Claude Code edit files; plan and ask are read-only. When Claude Code's own permission settings don't settle an action, Hesdor asks you, as for its own tools (TUI, editors; headless only with `--yes`, which allows them). Otherwise Claude Code denies it and Hesdor reports what was denied.
 - Claude Code's own tools, settings, hooks, MCP servers and memory apply. Hesdor's tools, permission rules, checkpoints, guardian, model roles and cost budget do not.
 - An API key in `ANTHROPIC_API_KEY` is not passed to Claude Code, so it uses your Claude login. No cost is shown on a plan.
 - Images you attach (`--image`, pasted, or `@file` in the prompt) go to Claude Code with the prompt.
