@@ -1,6 +1,6 @@
 # Use Hesdor from an editor (ACP)
 
-`hesdor acp` speaks the Agent Client Protocol (v1) on stdio, so VS Code, Zed, JetBrains, Neovim and Emacs clients can drive Hesdor. It streams messages, reasoning, tool calls and diffs, asks for approvals in the editor, and supports build/plan/ask modes, cancel and session loading.
+`hesdor acp` speaks the Agent Client Protocol (v1) on stdio, so VS Code, Zed, JetBrains, Neovim and Emacs clients can drive Hesdor. It streams messages, reasoning, tool calls and diffs, asks for approvals in the editor, and supports build/plan/ask modes, cancel, and listing (`session/list`, newest 50) and loading saved sessions.
 
 When the editor offers file access (ACP `fs/read_text_file` and `fs/write_text_file`), Hesdor's file tools use it: they read open files with your unsaved changes and write into the editor buffer, so its undo covers Hesdor's edits. Binary files, deletes and post-edit checks still use the disk.
 
