@@ -51,6 +51,12 @@
         "icon": "$(add)"
       },
       {
+        "command": "hesdor.openSession",
+        "title": "Open Session…",
+        "category": "Hesdor",
+        "icon": "$(history)"
+      },
+      {
         "command": "hesdor.cancel",
         "title": "Stop",
         "category": "Hesdor",
@@ -70,9 +76,14 @@
     "menus": {
       "view/title": [
         {
+          "command": "hesdor.openSession",
+          "when": "view == hesdor.chat",
+          "group": "navigation@1"
+        },
+        {
           "command": "hesdor.newSession",
           "when": "view == hesdor.chat",
-          "group": "navigation"
+          "group": "navigation@2"
         },
         {
           "command": "hesdor.cancel",
