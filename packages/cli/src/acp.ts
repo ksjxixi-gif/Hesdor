@@ -17,7 +17,7 @@ import type { Roles } from './roles.js'
 import { agentProviderFor, prettySummary, resolveWorkspaceRoot, runTurn, systemPromptFor } from './run.js'
 import { createSession } from './session.js'
 import type { Session } from './session.js'
-import { findSession, newSessionId, saveSession, titleFrom } from './sessions.js'
+import { findSession, listSessions, newSessionId, saveSession, titleFrom } from './sessions.js'
 import { isTrusted } from './trust.js'
 
 /**
@@ -269,6 +269,7 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
         agentInfo: { name: 'hesdor', title: 'Hesdor', version: VERSION },
         agentCapabilities: {
           loadSession: true,
+          sessionCapabilities: { list: {} },
           promptCapabilities: { embeddedContext: true },
           mcpCapabilities: { http: true },
         },
@@ -288,6 +289,13 @@ export function createAcpAgent(flags: CliFlags, deps: AcpDeps = {}): acp.AgentAp
     .onRequest('session/new', async ({ params }) => {
       const s = await open(params.cwd, params.mcpServers, newSessionId())
       return { sessionId: s.id, ...modeState(s) }
+    })
+    .onRequest('session/list', async ({ params }) => {
+      const ws = resolveWorkspaceRoot(params.cwd ?? process.cwd(), flags.allowHome)
+      if ('error' in ws) throw acp.RequestError.invalidParams(undefined, ws.error)
+      // shortcut: newest 50, no cursor paging; page if editors need the long tail.
+      const metas = await listSessions(ws.root, 50)
+      return { sessions: metas.map((m) => ({ sessionId: m.id, cwd: ws.root, title: m.title, updatedAt: new Date(m.updatedAt).toISOString() })) }
     })
     .onRequest('session/load', async ({ params, client }) => {
       const ws = resolveWorkspaceRoot(params.cwd, flags.allowHome)
