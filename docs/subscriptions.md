@@ -21,6 +21,6 @@ With `--provider claude-code` (or `hesdor setup` → Claude Code, or `/provider 
 - Modes: build lets Claude Code edit files; plan and ask are read-only. Commands run only when your Claude Code permission settings allow them, because nobody is there to approve them; Hesdor reports what was denied.
 - Claude Code's own tools, settings, hooks, MCP servers and memory apply. Hesdor's tools, permission rules, checkpoints, guardian, model roles and cost budget do not.
 - An API key in `ANTHROPIC_API_KEY` is not passed to Claude Code, so it uses your Claude login. No cost is shown on a plan.
-- Not yet: images.
+- Images you attach (`--image`, pasted, or `@file` in the prompt) go to Claude Code with the prompt.
 
 Tokens from `hesdor login chatgpt` are stored owner-only in your user config directory, never in a repository, and `hesdor logout chatgpt` revokes them. They are only ever sent to api.openai.com: other base URLs are refused, redirects are not followed with a token, and the ID token is validated (signature, issuer, audience, nonce).
