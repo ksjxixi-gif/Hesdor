@@ -259,6 +259,7 @@ input.addEventListener('keydown', (e) => {
 })
 // Starter prompts on the welcome screen fill the box; you edit and send them.
 log.addEventListener('click', (e) => {
+  if ((e.target as HTMLElement).closest('[data-action="openSession"]')) return send({ type: 'openSession' })
   const prompt = (e.target as HTMLElement).closest<HTMLElement>('[data-prompt]')?.dataset.prompt
   if (!prompt) return
   input.value = prompt
