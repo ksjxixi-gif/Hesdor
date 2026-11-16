@@ -9,6 +9,7 @@ the published CLI package (`packages/cli`).
 
 ### Added
 
+- VS Code extension redesign: answers render as markdown (headings, lists, links, code blocks with Copy), a welcome screen with starter prompts, a "Working…" row while a turn runs, Send turns into Stop, tool calls as compact rows with status icons and their changed files as one-click diff chips, a plan card with progress, clearer permission prompts, and a new icon.
 - `claude-code` provider: a resumed Hesdor session (`-c`, `-r`, `/sessions`) continues its Claude Code conversation after a restart instead of starting a new one.
 - `claude-code` provider: actions Claude Code's own permission settings don't settle ask you in Hesdor's approval prompt (TUI, editors, headless `--yes`) instead of being denied.
 - `claude-code` provider: attached images (`--image`, pasted, `@file`) reach Claude Code with the prompt.
