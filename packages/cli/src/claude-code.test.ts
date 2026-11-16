@@ -1,13 +1,13 @@
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { RunEvent } from '@hesdor/protocol'
-import { claudeCodeArgs, conversationId, createTranslator, toolSummary, wrongConversationFlag } from './claude-code.js'
+import { claudeCodeArgs, conversationId, createTranslator, toolSummary, userMessage, wrongConversationFlag } from './claude-code.js'
 
 const root = path.resolve('/repo')
 
 describe('claude-code', () => {
   it('maps Hesdor modes and models to claude -p flags', () => {
-    expect(claudeCodeArgs('build', 'default')).toEqual(['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', 'acceptEdits'])
+    expect(claudeCodeArgs('build', 'default')).toEqual(['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', 'acceptEdits'])
     expect(claudeCodeArgs('ask', 'sonnet', { id: 'abc', resume: true }).slice(-5)).toEqual(['plan', '--model', 'sonnet', '--resume', 'abc'])
     expect(claudeCodeArgs('build', 'default', { id: 'abc', resume: false }).slice(-2)).toEqual(['--session-id', 'abc'])
   })
@@ -17,6 +17,20 @@ describe('claude-code', () => {
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(conversationId('mhx1-abc123')).toBe(id)
     expect(conversationId('mhx1-abc124')).not.toBe(id)
+  })
+
+  it('sends the prompt and its images as one stream-json user message', () => {
+    expect(JSON.parse(userMessage('what is this?', [{ mediaType: 'image/png', data: 'AAAA' }]))).toEqual({
+      type: 'user',
+      message: {
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAAA' } },
+          { type: 'text', text: 'what is this?' },
+        ],
+      },
+    })
+    expect(userMessage('hi').endsWith('\n')).toBe(true)
   })
 
   it('spots a --resume or --session-id that Claude Code refused', () => {
