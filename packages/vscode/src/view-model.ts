@@ -33,6 +33,7 @@ export type FromView =
   | { type: 'prompt'; text: string }
   | { type: 'cancel' }
   | { type: 'newSession' }
+  | { type: 'openSession' }
   | { type: 'setOption'; configId: string; value: string }
   | { type: 'permission'; id: number; optionId: string | null }
   | { type: 'showDiff'; item: number; diff: number }
@@ -108,6 +109,14 @@ export function applyUpdate(s: ViewState, u: acp.SessionUpdate): void {
     default:
       return
   }
+}
+
+/** A saved session as a quick-pick row: its title, and how long ago it was last used. */
+export function sessionPick(s: acp.SessionInfo, now = Date.now()): { label: string; description: string; sessionId: string } {
+  const t = s.updatedAt ? Date.parse(s.updatedAt) : NaN
+  const min = Math.round((now - t) / 60_000)
+  const ago = Number.isNaN(t) ? '' : min < 1 ? 'just now' : min < 60 ? `${min} min ago` : min < 1440 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} d ago`
+  return { label: s.title || '(untitled)', description: ago, sessionId: s.sessionId }
 }
 
 /** Shows a permission request; the answer arrives later through answerPermission. */
