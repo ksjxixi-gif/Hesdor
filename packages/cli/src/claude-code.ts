@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { createInterface } from 'node:readline'
 import type { AgentMode, RunEvent, TodoItem, Usage } from '@hesdor/protocol'
@@ -10,15 +11,28 @@ import type { TurnOptions, TurnResult } from './run.js'
  * Claude Code's own tools, permissions and settings apply, not Hesdor's.
  */
 
-/** Claude Code conversation per Hesdor session, so later turns resume it. */
-const conversations = new Map<string, string>()
+/**
+ * The Claude Code conversation of a Hesdor session: a UUID derived from the session id, so later turns
+ * (and a Hesdor restart that resumes the session) continue it without storing anything.
+ */
+export function conversationId(sessionId: string): string {
+  const h = createHash('sha256').update(`hesdor-claude-code:${sessionId}`).digest('hex')
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-${((parseInt(h[16]!, 16) & 3) | 8).toString(16)}${h.slice(17, 20)}-${h.slice(20, 32)}`
+}
 
-export function claudeCodeArgs(mode: AgentMode, model: string, resume?: string): string[] {
+export type Conversation = { id: string; resume: boolean }
+
+export function claudeCodeArgs(mode: AgentMode, model: string, conversation?: Conversation): string[] {
   // build may edit files; plan and ask stay read-only. Commands follow the user's Claude Code permission rules.
   const args = ['-p', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', mode === 'build' ? 'acceptEdits' : 'plan']
   if (model && model !== 'default') args.push('--model', model)
-  if (resume) args.push('--resume', resume)
+  if (conversation) args.push(conversation.resume ? '--resume' : '--session-id', conversation.id)
   return args
+}
+
+/** Claude Code refused the conversation flag: `--resume` of one it never saw, or `--session-id` of one it has. */
+export function wrongConversationFlag(output: string): boolean {
+  return /No conversation found with session ID|Session ID \S+ is already in use/i.test(output)
 }
 
 /** One line for a tool call: its name and the input that matters most. */
@@ -106,11 +120,9 @@ export function createTranslator(root: string, emit: (e: RunEvent) => void, emit
 /** A turn run by the user's Claude Code. Its result is shaped like a Hesdor turn so every front end works unchanged. */
 export async function runClaudeCodeTurn(opts: TurnOptions): Promise<TurnResult> {
   const history = opts.history ?? []
-  const resume = opts.sessionId ? conversations.get(opts.sessionId) : undefined
-  if (!resume && history.some((m) => m.role === 'user')) {
-    opts.emit({ type: 'hook.notice', event: 'claude-code', message: 'Claude Code starts a new conversation here; it does not see the earlier turns of this session.' })
-  }
-  const { handle, state } = createTranslator(opts.root, opts.emit, opts.emitSubagent)
+  const earlier = history.some((m) => m.role === 'user')
+  // Earlier turns: continue their Claude Code conversation. If they ran on another provider, Claude Code says so and we start one.
+  let conversation: Conversation | undefined = opts.sessionId ? { id: conversationId(opts.sessionId), resume: earlier } : undefined
   // Claude Code prefers an API key in the environment over the user's Claude login; this provider is for the login.
   const env = { ...process.env }
   for (const k of ['ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDECODE']) delete env[k]
@@ -125,29 +137,42 @@ export async function runClaudeCodeTurn(opts: TurnOptions): Promise<TurnResult> 
     }
   }
 
-  let stderr = ''
-  const exit = await new Promise<{ code: number | null; error?: NodeJS.ErrnoException }>((resolve) => {
-    // shortcut: no shell, so on Windows only an installed claude.exe (native installer, winget) is found; add a .cmd lookup if npm installs need it.
-    const child = spawn('claude', claudeCodeArgs(opts.mode, opts.provider.model, resume), { cwd: opts.root, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
-    const abort = (): void => void child.kill()
-    opts.signal.addEventListener('abort', abort, { once: true })
-    child.on('error', (error: NodeJS.ErrnoException) => resolve({ code: null, error }))
-    child.stderr.on('data', (d: Buffer) => (stderr = (stderr + d.toString()).slice(-2000)))
-    createInterface({ input: child.stdout }).on('line', (line) => {
-      try {
-        handle(JSON.parse(line), opts.mode)
-      } catch {
-        // not a JSON event (a stray log line)
-      }
+  const attempt = async () => {
+    const { handle, state } = createTranslator(opts.root, opts.emit, opts.emitSubagent)
+    let stderr = ''
+    const exit = await new Promise<{ code: number | null; error?: NodeJS.ErrnoException }>((resolve) => {
+      // shortcut: no shell, so on Windows only an installed claude.exe (native installer, winget) is found; add a .cmd lookup if npm installs need it.
+      const child = spawn('claude', claudeCodeArgs(opts.mode, opts.provider.model, conversation), { cwd: opts.root, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
+      const abort = (): void => void child.kill()
+      opts.signal.addEventListener('abort', abort, { once: true })
+      child.on('error', (error: NodeJS.ErrnoException) => resolve({ code: null, error }))
+      child.stderr.on('data', (d: Buffer) => (stderr = (stderr + d.toString()).slice(-2000)))
+      createInterface({ input: child.stdout }).on('line', (line) => {
+        try {
+          handle(JSON.parse(line), opts.mode)
+        } catch {
+          // not a JSON event (a stray log line)
+        }
+      })
+      child.on('close', (code) => {
+        opts.signal.removeEventListener('abort', abort)
+        resolve({ code })
+      })
+      child.stdin.end(opts.prompt)
     })
-    child.on('close', (code) => {
-      opts.signal.removeEventListener('abort', abort)
-      resolve({ code })
-    })
-    child.stdin.end(opts.prompt)
-  })
+    return { exit, stderr, state }
+  }
 
-  if (state.sessionId && opts.sessionId) conversations.set(opts.sessionId, state.sessionId)
+  let { exit, stderr, state } = await attempt()
+  const errors = (state.result as { errors?: unknown } | undefined)?.errors
+  if (conversation && !state.sessionId && !opts.signal.aborted && wrongConversationFlag(`${stderr}\n${Array.isArray(errors) ? errors.join('\n') : ''}`)) {
+    conversation = { ...conversation, resume: !conversation.resume }
+    if (!conversation.resume && earlier) {
+      opts.emit({ type: 'hook.notice', event: 'claude-code', message: 'Claude Code starts a new conversation here; it does not see the earlier turns of this session.' })
+    }
+    ;({ exit, stderr, state } = await attempt())
+  }
+
   if (opts.signal.aborted) {
     opts.emit({ type: 'run.cancelled' })
     return finish({ status: 'cancelled' })
