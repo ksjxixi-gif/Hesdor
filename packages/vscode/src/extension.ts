@@ -90,10 +90,26 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
     <textarea id="input" rows="2" aria-label="Message Hesdor" placeholder="Ask Hesdor… (Enter to send, Shift+Enter for a new line)"></textarea>
     <div class="bar">
       <div id="options"></div>
-      <button id="send" type="button" title="Send (Enter)">Send</button>
+      <button id="send" type="button" title="Send (Enter)" aria-label="Send">
+        <svg class="i-send" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <svg class="i-stop" viewBox="0 0 16 16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor"/></svg>
+      </button>
     </div>
   </div>
 </footer>
+<template id="welcome">
+  <div class="welcome">
+    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 20.1 7.3v9.4L12 21.4l-8.1-4.7V7.3Z" stroke-width="1.2"/><path d="m8.6 9.4 2.6 2.6-2.6 2.6M12.9 14.6h2.7" stroke-width="1.4"/></svg>
+    <h1>Hesdor</h1>
+    <p>Plan, explain or change code in this workspace. Changes open in the diff editor for review.</p>
+    <div class="starters">
+      <button type="button" class="starter" data-prompt="Give me a quick tour of this codebase: what it does and where the main pieces live.">Tour this codebase</button>
+      <button type="button" class="starter" data-prompt="Find likely bugs in this workspace and explain each one briefly.">Find likely bugs</button>
+      <button type="button" class="starter" data-prompt="Write tests for ">Write tests for…</button>
+    </div>
+    <p class="hint">Tip: select code and run <b>Hesdor: Add Selection to Chat</b> to attach it.</p>
+  </div>
+</template>
 <script nonce="${nonce}" src="${js}"></script>
 </body>
 </html>`
