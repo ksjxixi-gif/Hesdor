@@ -4,8 +4,9 @@ Chat with the [Hesdor](https://github.com/ksjxixi-gif/Hesdor) coding agent from 
 
 ## What you get
 
-- A **Hesdor** view in the activity bar: streamed answers, collapsible reasoning, every tool call with its status and output, and the agent's plan.
-- **Build, plan and ask** modes from the picker at the top, **Stop** to cancel a turn, **New** for a fresh session.
+- A **Hesdor** view in the activity bar: streamed markdown answers (code blocks with Copy), collapsible reasoning, every tool call with its status, output and changed files, and the agent's plan with its progress.
+- **Build, plan and ask** modes and the **model** from the menus under the message box; the send button turns into **Stop** while a turn runs.
+- **New** starts a fresh session; **Open Session…** (the history icon, or the welcome screen) continues a saved one of this workspace, including sessions started in the terminal.
 - **File changes are reviewed in VS Code's diff editor.** When Hesdor wants to edit a file, the proposed change opens side by side and the chat shows Allow, Allow for this session and Reject.
 - **Edits go through the editor.** Hesdor reads open files as you see them, unsaved changes included, and writes into the editor buffer and saves, so **Undo** works on its changes.
 - **Hesdor: Add Selection to Chat** (editor context menu) attaches the selected code to your next message.
