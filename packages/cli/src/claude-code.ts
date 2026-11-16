@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createInterface } from 'node:readline'
 import type { AgentMode, ChatImage, RunEvent, TodoItem, Usage } from '@hesdor/protocol'
 import type { TurnOptions, TurnResult } from './run.js'
+import { APPROVAL_TOOL, startApprovalServer } from './claude-code-approval.js'
 
 /**
  * The `claude-code` provider: Hesdor shows the work of the user's own signed-in Claude Code (`claude -p`,
@@ -22,11 +23,13 @@ export function conversationId(sessionId: string): string {
 
 export type Conversation = { id: string; resume: boolean }
 
-export function claudeCodeArgs(mode: AgentMode, model: string, conversation?: Conversation): string[] {
+export function claudeCodeArgs(mode: AgentMode, model: string, conversation?: Conversation, approvalMcpConfig?: string): string[] {
   // build may edit files; plan and ask stay read-only. Commands follow the user's Claude Code permission rules.
   const args = ['-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--permission-mode', mode === 'build' ? 'acceptEdits' : 'plan']
   if (model && model !== 'default') args.push('--model', model)
   if (conversation) args.push(conversation.resume ? '--resume' : '--session-id', conversation.id)
+  // Actions Claude Code's own rules don't settle ask the Hesdor user instead of being denied.
+  if (approvalMcpConfig) args.push('--mcp-config', approvalMcpConfig, '--permission-prompt-tool', APPROVAL_TOOL)
   return args
 }
 
@@ -152,7 +155,7 @@ export async function runClaudeCodeTurn(opts: TurnOptions): Promise<TurnResult> 
     let stderr = ''
     const exit = await new Promise<{ code: number | null; error?: NodeJS.ErrnoException }>((resolve) => {
       // shortcut: no shell, so on Windows only an installed claude.exe (native installer, winget) is found; add a .cmd lookup if npm installs need it.
-      const child = spawn('claude', claudeCodeArgs(opts.mode, opts.provider.model, conversation), { cwd: opts.root, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
+      const child = spawn('claude', claudeCodeArgs(opts.mode, opts.provider.model, conversation, approvals?.mcpConfig), { cwd: opts.root, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
       const abort = (): void => void child.kill()
       opts.signal.addEventListener('abort', abort, { once: true })
       child.on('error', (error: NodeJS.ErrnoException) => resolve({ code: null, error }))
@@ -173,15 +176,23 @@ export async function runClaudeCodeTurn(opts: TurnOptions): Promise<TurnResult> 
     return { exit, stderr, state }
   }
 
-  let { exit, stderr, state } = await attempt()
-  const errors = (state.result as { errors?: unknown } | undefined)?.errors
-  if (conversation && !state.sessionId && !opts.signal.aborted && wrongConversationFlag(`${stderr}\n${Array.isArray(errors) ? errors.join('\n') : ''}`)) {
-    conversation = { ...conversation, resume: !conversation.resume }
-    if (!conversation.resume && earlier) {
-      opts.emit({ type: 'hook.notice', event: 'claude-code', message: 'Claude Code starts a new conversation here; it does not see the earlier turns of this session.' })
+  // Without a host that can ask (headless without --yes), Claude Code denies what its rules don't allow and we report it.
+  const approvals = opts.approvalsEnabled ? await startApprovalServer(opts.requestApproval, opts.root) : undefined
+  let run: Awaited<ReturnType<typeof attempt>>
+  try {
+    run = await attempt()
+    const errors = (run.state.result as { errors?: unknown } | undefined)?.errors
+    if (conversation && !run.state.sessionId && !opts.signal.aborted && wrongConversationFlag(`${run.stderr}\n${Array.isArray(errors) ? errors.join('\n') : ''}`)) {
+      conversation = { ...conversation, resume: !conversation.resume }
+      if (!conversation.resume && earlier) {
+        opts.emit({ type: 'hook.notice', event: 'claude-code', message: 'Claude Code starts a new conversation here; it does not see the earlier turns of this session.' })
+      }
+      run = await attempt()
     }
-    ;({ exit, stderr, state } = await attempt())
+  } finally {
+    approvals?.close()
   }
+  const { exit, stderr, state } = run
 
   if (opts.signal.aborted) {
     opts.emit({ type: 'run.cancelled' })
@@ -203,7 +214,8 @@ export async function runClaudeCodeTurn(opts: TurnOptions): Promise<TurnResult> 
     return finish({ status: 'failed', error, errorKind: 'unknown' })
   }
   const denied: { tool_name?: string }[] = Array.isArray(r.permission_denials) ? r.permission_denials : []
-  if (denied.length > 0) {
+  // With approvals on, a denial was the user's own answer and needs no hint.
+  if (denied.length > 0 && !approvals) {
     const names = [...new Set(denied.map((d) => d.tool_name ?? 'tool'))].join(', ')
     opts.emit({ type: 'hook.notice', event: 'claude-code', message: `Claude Code was not allowed to run ${denied.length} action(s) (${names}); allow them in Claude Code's own permission settings.` })
   }
