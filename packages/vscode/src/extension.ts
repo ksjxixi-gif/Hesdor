@@ -6,7 +6,7 @@ import { NPX_FALLBACK, cmdQuote, resolveCommand, startAgent } from './agent.js'
 import type { AgentProcess, Command } from './agent.js'
 import { readTextFile, writeTextFile } from './fs-handlers.js'
 import type { EditorFiles } from './fs-handlers.js'
-import { addPermission, answerPermission, applyUpdate, initialState, permissionResponse, setOption } from './view-model.js'
+import { addPermission, answerPermission, applyUpdate, initialState, permissionResponse, sessionPick, setOption } from './view-model.js'
 import type { Diff, FromView, ToView, ViewState } from './view-model.js'
 
 const DIFF_SCHEME = 'hesdor-diff'
@@ -20,6 +20,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider('hesdor.chat', chat, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.workspace.registerTextDocumentContentProvider(DIFF_SCHEME, chat.diffDocs),
     vscode.commands.registerCommand('hesdor.newSession', () => chat.newSession()),
+    vscode.commands.registerCommand('hesdor.openSession', () => chat.openSession()),
     vscode.commands.registerCommand('hesdor.cancel', () => chat.cancel()),
     vscode.commands.registerCommand('hesdor.addSelection', () => chat.addSelection()),
     vscode.commands.registerCommand('hesdor.setup', () => chat.runSetup()),
@@ -107,6 +108,7 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
       <button type="button" class="starter" data-prompt="Find likely bugs in this workspace and explain each one briefly.">Find likely bugs</button>
       <button type="button" class="starter" data-prompt="Write tests for ">Write tests for…</button>
     </div>
+    <button type="button" class="ghost" data-action="openSession">Continue a previous session…</button>
     <p class="hint">Tip: select code and run <b>Hesdor: Add Selection to Chat</b> to attach it.</p>
   </div>
 </template>
@@ -137,6 +139,8 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
         return this.cancel()
       case 'newSession':
         return this.newSession()
+      case 'openSession':
+        return this.openSession()
       case 'setOption':
         return this.setOption(m.configId, m.value)
       case 'permission': {
@@ -264,14 +268,43 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
     if (this.agent && this.sessionId) await this.agent.connection.agent.notify('session/cancel', { sessionId: this.sessionId })
   }
 
-  async newSession(): Promise<void> {
+  /** Stops the current session's turn and clears the view; attached selections carry over. */
+  private async reset(sessionId?: string): Promise<void> {
     await this.cancel()
     for (const p of this.pending.values()) p.resolve({ outcome: { outcome: 'cancelled' } })
     this.pending.clear()
-    this.sessionId = undefined
+    this.sessionId = sessionId
     this.state = { ...initialState(), context: this.state.context }
     this.post()
+  }
+
+  async newSession(): Promise<void> {
+    await this.reset()
     await this.ensureSession().catch((err) => this.fail(err))
+  }
+
+  /** Picks a saved session of this workspace and continues it; the agent replays its messages. */
+  async openSession(): Promise<void> {
+    try {
+      const agent = await this.ensureAgent()
+      if (!agent.init.agentCapabilities?.sessionCapabilities?.list) {
+        void vscode.window.showWarningMessage('This hesdor CLI cannot list sessions yet. Update it (`hesdor upgrade`) and try again.')
+        return
+      }
+      const { sessions } = await agent.connection.agent.request('session/list', { cwd: this.cwd() })
+      const picked = await vscode.window.showQuickPick(
+        sessions.map((s) => sessionPick(s)),
+        { title: 'Open a Hesdor session', placeHolder: sessions.length ? 'Continue a session in this workspace' : 'No saved sessions in this workspace yet' },
+      )
+      if (!picked) return
+      // Set before loading so the replayed messages pass the session filter in update().
+      await this.reset(picked.sessionId)
+      const res = await agent.connection.agent.request('session/load', { sessionId: picked.sessionId, cwd: this.cwd(), mcpServers: [] })
+      this.state.options = res?.configOptions ?? []
+      this.post()
+    } catch (err) {
+      this.fail(err)
+    }
   }
 
   private async setOption(configId: string, value: string): Promise<void> {
