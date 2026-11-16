@@ -76,6 +76,7 @@ describe('hesdor acp', () => {
       return { init, session }
     })
     expect(res.init.agentCapabilities?.loadSession).toBe(true)
+    expect(res.init.agentCapabilities?.sessionCapabilities?.list).toEqual({})
     expect(res.init.authMethods?.map((m) => m.id)).toEqual(['hesdor-setup', 'hesdor-setup-terminal'])
     expect(res.init.authMethods?.[1]).toMatchObject({ type: 'terminal', args: ['setup'] })
     expect(res.session.modes?.currentModeId).toBe('build')
@@ -142,6 +143,9 @@ describe('hesdor acp', () => {
       await expect(ctx.request('session/set_mode', { sessionId, modeId: 'yolo' })).rejects.toThrow()
       await ctx.request('session/prompt', { sessionId, prompt: [{ type: 'text', text: 'hi there' }] })
       expect(provider.requests[0]![0]!.content).toContain('MODE: plan.')
+
+      const listed = await ctx.request('session/list', { cwd })
+      expect(listed.sessions).toEqual([{ sessionId, cwd: expect.any(String), title: 'hi there', updatedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT/) }])
 
       updates.length = 0
       const loaded = await ctx.request('session/load', { sessionId, cwd, mcpServers: [] })
