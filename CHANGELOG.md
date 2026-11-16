@@ -10,6 +10,7 @@ the published CLI package (`packages/cli`).
 ### Added
 
 - `claude-code` provider: a resumed Hesdor session (`-c`, `-r`, `/sessions`) continues its Claude Code conversation after a restart instead of starting a new one.
+- `claude-code` provider: attached images (`--image`, pasted, `@file`) reach Claude Code with the prompt.
 
 ## [0.3.2] - 2026-11-15
 
