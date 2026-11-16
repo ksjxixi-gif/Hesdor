@@ -1,3 +1,13 @@
+/* Theme colors only (var(--vscode-*)), so the view follows any light, dark or high-contrast theme. */
+:root {
+  --radius: 8px;
+  --accent: var(--vscode-button-background);
+  --muted: var(--vscode-descriptionForeground);
+  --line: var(--vscode-widget-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.25)));
+  --surface: var(--vscode-editorWidget-background, var(--vscode-input-background));
+  --mono: var(--vscode-editor-font-family);
+}
+
 body {
   display: flex;
   flex-direction: column;
@@ -8,15 +18,7 @@ body {
   background: var(--vscode-sideBar-background);
   font-family: var(--vscode-font-family);
   font-size: var(--vscode-font-size);
-  line-height: 1.45;
-}
-
-footer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: center;
-  padding: 8px 10px 10px;
+  line-height: 1.5;
 }
 
 #log {
@@ -25,8 +27,67 @@ footer {
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 10px;
+  padding: 12px 12px 4px;
 }
+
+footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px 10px;
+}
+
+:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}
+
+/* ---------- buttons ---------- */
+
+button {
+  padding: 3px 10px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+button.primary {
+  color: var(--vscode-button-foreground);
+  background: var(--accent);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--vscode-button-hoverBackground);
+}
+
+button.ghost {
+  padding: 1px 6px;
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.9em;
+}
+
+button.ghost:hover:not(:disabled) {
+  color: var(--vscode-foreground);
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+button:disabled,
+select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ---------- composer ---------- */
 
 /* Text on top; below it the mode and model menus and Send, like VS Code's own chat input. */
 .composer {
@@ -34,15 +95,37 @@ footer {
   flex: 1 1 100%;
   flex-direction: column;
   gap: 4px;
-  padding: 6px 6px 4px;
-  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
-  border-radius: 6px;
+  padding: 8px 8px 6px;
+  border: 1px solid var(--vscode-input-border, var(--line));
+  border-radius: var(--radius);
   background: var(--vscode-input-background);
+  transition: border-color 0.12s;
 }
 
-/* The box shows focus for the textarea inside it. */
 .composer:focus-within {
   border-color: var(--vscode-focusBorder);
+}
+
+textarea {
+  field-sizing: content;
+  min-height: 2.9em;
+  max-height: 14em;
+  padding: 0 2px;
+  resize: none;
+  border: none;
+  outline: none;
+  color: var(--vscode-input-foreground);
+  background: transparent;
+  font: inherit;
+}
+
+/* The composer's border shows focus; a second outline on the textarea doubled it. */
+textarea:focus-visible {
+  outline: none;
+}
+
+textarea::placeholder {
+  color: var(--vscode-input-placeholderForeground);
 }
 
 .bar {
@@ -59,14 +142,22 @@ footer {
   min-width: 0;
 }
 
+select {
+  font: inherit;
+  color: var(--vscode-dropdown-foreground);
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border, transparent);
+  border-radius: 4px;
+}
+
 /* Menus in the bar read as quiet labels until hovered or focused. */
 #options select {
   max-width: 100%;
   padding: 1px 2px;
   border-color: transparent;
-  border-radius: 4px;
-  color: var(--vscode-descriptionForeground);
+  color: var(--muted);
   background: transparent;
+  font-size: 0.92em;
   text-overflow: ellipsis;
   cursor: pointer;
 }
@@ -87,133 +178,448 @@ footer {
   background: var(--vscode-dropdown-background);
 }
 
-textarea {
-  field-sizing: content;
-  min-height: 2.9em;
-  max-height: 14em;
-  padding: 2px;
-  resize: none;
-  border: none;
-  outline: none;
-  color: var(--vscode-input-foreground);
-  background: transparent;
-  font: inherit;
-}
-
-/* The composer's border shows focus; a second outline on the textarea doubled it. */
-textarea:focus-visible {
-  outline: none;
-}
-
-textarea::placeholder {
-  color: var(--vscode-input-placeholderForeground);
-}
-
-select {
-  font: inherit;
-  color: var(--vscode-dropdown-foreground);
-  background: var(--vscode-dropdown-background);
-  border: 1px solid var(--vscode-dropdown-border, transparent);
-  border-radius: 2px;
-}
-
-button {
-  padding: 3px 10px;
-  border: 1px solid var(--vscode-button-border, transparent);
-  border-radius: 2px;
-  color: var(--vscode-button-secondaryForeground);
-  background: var(--vscode-button-secondaryBackground);
-  font: inherit;
-  cursor: pointer;
-}
-
-button.primary,
+/* Round icon button: an arrow to send, a square to stop while a turn runs. */
 #send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
   color: var(--vscode-button-foreground);
-  background: var(--vscode-button-background);
+  background: var(--accent);
 }
 
-button:hover:not(:disabled) {
-  background: var(--vscode-button-secondaryHoverBackground);
-}
-
-button.primary:hover:not(:disabled),
-#send:hover:not(:disabled) {
+#send:hover {
   background: var(--vscode-button-hoverBackground);
 }
 
-button:disabled,
-select:disabled {
-  opacity: 0.5;
-  cursor: default;
+#send svg {
+  width: 15px;
+  height: 15px;
 }
 
-:focus-visible {
-  outline: 1px solid var(--vscode-focusBorder);
-  outline-offset: 1px;
+#send .i-stop,
+#send.stop .i-send {
+  display: none;
 }
+
+#send.stop .i-stop {
+  display: block;
+}
+
+#send.stop {
+  color: var(--vscode-foreground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+#context {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+#context:empty {
+  display: none;
+}
+
+.chip {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 0.9em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- welcome ---------- */
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  max-width: 24em;
+  margin: auto;
+  padding: 16px 0;
+  text-align: center;
+}
+
+.welcome .logo {
+  width: 44px;
+  height: 44px;
+  color: var(--accent);
+}
+
+.welcome h1 {
+  margin: 4px 0 0;
+  font-size: 1.35em;
+  font-weight: 600;
+}
+
+.welcome p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.starters {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-self: stretch;
+  margin: 10px 0 6px;
+}
+
+.starter {
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--vscode-foreground);
+  background: var(--surface);
+  text-align: left;
+}
+
+.starter:hover:not(:disabled) {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-hoverBackground);
+}
+
+.welcome .hint {
+  font-size: 0.9em;
+}
+
+/* ---------- messages ---------- */
 
 .msg,
 .error,
 .permission .title {
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.msg {
-  margin: 6px 0;
+.msg.user,
+.error,
+.permission .title {
+  white-space: pre-wrap;
 }
 
 /* Your messages sit on the right as bubbles; the agent's answers run full width. */
 .msg.user {
   align-self: flex-end;
   max-width: 85%;
-  margin: 12px 0 6px;
-  padding: 6px 10px;
-  border-radius: 10px 10px 2px 10px;
+  margin: 14px 0 8px;
+  padding: 6px 11px;
+  border: 1px solid var(--vscode-chat-requestBorder, var(--line));
+  border-radius: 12px 12px 3px 12px;
   background: var(--vscode-chat-requestBackground, var(--vscode-input-background));
-  border: 1px solid var(--vscode-chat-requestBorder, var(--vscode-panel-border));
 }
 
 .msg.user:first-child {
   margin-top: 0;
 }
 
-details {
-  margin: 3px 0;
+.msg.agent {
+  margin: 4px 0;
 }
 
-summary {
-  cursor: pointer;
-  color: var(--vscode-descriptionForeground);
+.msg.agent > :first-child {
+  margin-top: 0;
+}
+
+.msg.agent > :last-child {
+  margin-bottom: 0;
+}
+
+.msg.agent p,
+.msg.agent ul,
+.msg.agent ol,
+.msg.agent blockquote {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+}
+
+.msg.agent ul,
+.msg.agent ol {
+  padding-left: 1.4em;
+  white-space: normal;
+}
+
+.msg.agent li + li {
+  margin-top: 2px;
+}
+
+.msg.agent h3,
+.msg.agent h4,
+.msg.agent h5,
+.msg.agent h6 {
+  margin: 12px 0 6px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.msg.agent h3 {
+  font-size: 1.08em;
+}
+
+.msg.agent blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--vscode-textBlockQuote-border, var(--line));
+  color: var(--muted);
+}
+
+.msg.agent hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--line);
+}
+
+.msg.agent a {
+  color: var(--vscode-textLink-foreground);
+  text-decoration: none;
+}
+
+.msg.agent a:hover {
+  color: var(--vscode-textLink-activeForeground);
+  text-decoration: underline;
+}
+
+code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--vscode-textCodeBlock-background);
+  font-family: var(--mono);
   font-size: 0.92em;
-}
-
-summary:hover {
-  color: var(--vscode-foreground);
-}
-
-.tool.failed > summary {
-  color: var(--vscode-errorForeground);
 }
 
 pre {
   max-height: 20em;
   overflow: auto;
   margin: 4px 0;
-  padding: 6px 8px;
-  border-radius: 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   background: var(--vscode-textCodeBlock-background);
-  font-family: var(--vscode-editor-font-family);
+  font-family: var(--mono);
   font-size: var(--vscode-editor-font-size);
 }
 
+pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.codeblock {
+  margin: 0 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.codeblock pre {
+  margin: 0;
+  border-radius: 0;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.codehead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1px 4px 1px 10px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 0.85em;
+}
+
+/* ---------- thinking and tool calls ---------- */
+
+details {
+  margin: 2px 0;
+}
+
+summary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 0.92em;
+  list-style: none;
+  cursor: pointer;
+}
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+summary:hover {
+  color: var(--vscode-foreground);
+  background: var(--vscode-list-hoverBackground);
+}
+
+summary .label {
+  overflow: hidden;
+  font-family: var(--mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A chevron that turns when open; tool rows with nothing to show have none. */
+summary::after {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin-left: auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.6;
+  transform: rotate(-45deg);
+  transition: transform 0.12s;
+}
+
+details[open] > summary::after {
+  transform: rotate(45deg);
+}
+
+.tool.bare > summary {
+  cursor: default;
+}
+
+.tool.bare > summary::after {
+  display: none;
+}
+
+.thought summary .label {
+  font-family: inherit;
+  font-style: italic;
+}
+
+.thought-text {
+  color: var(--muted);
+  font-family: inherit;
+  font-style: italic;
+}
+
+details > :not(summary) {
+  margin-left: 22px;
+}
+
+.tool.failed > summary {
+  color: var(--vscode-errorForeground);
+}
+
+/* Status: hollow ring pending, spinning ring running, filled dot done, red dot failed. */
+.status {
+  flex: none;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+}
+
+.status.in_progress {
+  border-color: var(--accent);
+  border-right-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+.status.completed {
+  border-color: var(--vscode-testing-iconPassed, #3fb950);
+  background: var(--vscode-testing-iconPassed, #3fb950);
+}
+
+.status.failed {
+  border-color: var(--vscode-errorForeground);
+  background: var(--vscode-errorForeground);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 4px 0;
+}
+
+.tool-files {
+  margin: 0 0 4px 22px;
+}
+
+button.file {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  color: var(--vscode-foreground);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 0.9em;
+}
+
+.badge {
+  font-weight: 700;
+  font-size: 0.85em;
+}
+
+.badge.add {
+  color: var(--vscode-gitDecoration-addedResourceForeground, #3fb950);
+}
+
+.badge.edit {
+  color: var(--vscode-gitDecoration-modifiedResourceForeground, #d29922);
+}
+
+.working {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+  padding: 2px 6px;
+  color: var(--muted);
+  font-size: 0.92em;
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+    transform: scale(0.7);
+  }
+}
+
+/* ---------- notices, permissions, errors ---------- */
+
 .notice {
   margin: 4px 0;
-  color: var(--vscode-descriptionForeground);
-  font-style: italic;
+  padding: 2px 6px;
+  color: var(--muted);
+  font-size: 0.92em;
 }
 
 .notice.warning {
@@ -223,9 +629,47 @@ pre {
 .permission,
 .error {
   margin: 8px 0;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--vscode-focusBorder);
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.permission {
+  border-left: 3px solid var(--vscode-editorWarning-foreground, var(--accent));
+}
+
+.permission.answered {
+  border-left-color: var(--line);
+  opacity: 0.8;
+}
+
+.permission .kicker {
+  color: var(--vscode-editorWarning-foreground);
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.permission.answered .kicker {
+  color: var(--muted);
+}
+
+.permission .title {
+  margin: 2px 0 6px;
+  font-family: var(--mono);
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.answer {
+  color: var(--muted);
 }
 
 .error {
@@ -239,60 +683,66 @@ pre {
   margin-top: 8px;
 }
 
-.permission .title {
-  margin-bottom: 6px;
-  font-weight: 600;
-}
+/* ---------- plan ---------- */
 
-.permission button,
-.tool button {
-  margin: 4px 4px 0 0;
-}
-
-.answer {
-  margin-top: 4px;
-  color: var(--vscode-descriptionForeground);
-}
-
-.empty {
-  margin: auto;
-  max-width: 22em;
-  text-align: center;
-  color: var(--vscode-descriptionForeground);
-}
-
-#plan {
-  padding: 0 10px;
-}
-
-#plan h2 {
-  margin: 6px 0 2px;
-  font-size: 1em;
-}
-
-#plan ul {
-  margin: 0 0 6px;
-  padding-left: 1.2em;
-  list-style: none;
-}
-
-#plan li.completed {
-  color: var(--vscode-descriptionForeground);
-  text-decoration: line-through;
-}
-
-#context {
-  display: flex;
-  flex: 1 1 100%;
-  gap: 6px;
-  align-items: center;
-}
-
-#context:empty {
+#plan:empty {
   display: none;
 }
 
-.chips {
-  flex: 1;
-  color: var(--vscode-descriptionForeground);
+#plan {
+  margin: 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.planhead {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.planhead .count {
+  color: var(--muted);
+  font-weight: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress {
+  height: 3px;
+  margin: 6px 0;
+  border-radius: 2px;
+  background: linear-gradient(var(--accent), var(--accent)) no-repeat 0 0 / var(--done, 0%) 100%, var(--line);
+}
+
+#plan ul {
+  max-height: 9em;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#plan li {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+#plan li .status {
+  position: relative;
+  top: 1px;
+}
+
+#plan li.completed span:last-child {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status.in_progress,
+  .pulse {
+    animation: none;
+  }
 }
