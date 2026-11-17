@@ -6,6 +6,7 @@
   "private": true,
   "type": "module",
   "publisher": "hesdor",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -105,7 +106,7 @@
         "hesdor.path": {
           "type": "string",
           "default": "hesdor",
-          "markdownDescription": "The `hesdor` CLI to start (a name on PATH or a full path). When it is not found, `npx -y @dean_overlord/hesdor` is used.",
+          "markdownDescription": "The `hesdor` CLI to start (a name on PATH or a full path). When it is not on PATH, the install script's default location is tried; if that fails too, the chat offers to install it.",
           "scope": "machine"
         },
         "hesdor.args": {
