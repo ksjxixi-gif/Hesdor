@@ -10,18 +10,32 @@ export interface Command {
   args: string[]
 }
 
-export const NPX_FALLBACK: Command = { command: 'npx', args: ['-y', '@dean_overlord/hesdor'] }
+const RAW = 'https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging'
+
+/** Where packaging/install.ps1 and install.sh put the binary by default. */
+export function defaultInstallPath(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string | null {
+  if (platform === 'win32') return env.LOCALAPPDATA ? path.join(env.LOCALAPPDATA, 'Programs', 'hesdor', 'hesdor.exe') : null
+  return env.HOME ? path.join(env.HOME, '.local', 'bin', 'hesdor') : null
+}
+
+/** A terminal that installs the standalone binary, then runs `hesdor setup` from where it landed. */
+export function installTerminal(platform: NodeJS.Platform = process.platform): { shellPath: string; text: string } {
+  return platform === 'win32'
+    ? { shellPath: 'powershell.exe', text: `irm ${RAW}/install.ps1 | iex; if ($?) { & "$env:LOCALAPPDATA\\Programs\\hesdor\\hesdor.exe" setup }` }
+    : { shellPath: '/bin/sh', text: `curl -fsSL ${RAW}/install.sh | sh && "$HOME/.local/bin/hesdor" setup` }
+}
 
 /**
- * The CLI to start: `configured` when it is a path or found on PATH (trying PATHEXT on Windows),
- * else the npx fallback.
+ * The CLI to start: `configured` when it is a path or found on PATH (trying PATHEXT on Windows), else the
+ * installer's default location (VS Code keeps the PATH it started with, so a fresh install is not on it yet),
+ * else null. npm only has 0.1.0, so there is no npx fallback.
  */
 export function resolveCommand(
   configured: string,
   env: NodeJS.ProcessEnv = process.env,
   platform: NodeJS.Platform = process.platform,
   exists: (file: string) => boolean = existsSync,
-): Command {
+): Command | null {
   const name = configured.trim() || 'hesdor'
   if (name.includes('/') || name.includes('\\')) return { command: name, args: [] }
   // On Windows npm puts a shell script `hesdor` next to `hesdor.cmd`; only PATHEXT names are runnable.
@@ -33,7 +47,8 @@ export function resolveCommand(
       if (exists(file)) return { command: file, args: [] }
     }
   }
-  return NPX_FALLBACK
+  const installed = defaultInstallPath(env, platform)
+  return installed && exists(installed) ? { command: installed, args: [] } : null
 }
 
 /** Quote for cmd.exe when a .cmd/.bat shim must run through the shell (Node refuses them without it). */
@@ -41,10 +56,10 @@ export function cmdQuote(arg: string): string {
   return /^[\w\-./:\\=@]+$/.test(arg) ? arg : `"${arg.replace(/"/g, '""')}"`
 }
 
-/** How to spawn `cmd` with `args` on this platform: Windows .cmd shims and npx go through the shell, quoted. */
+/** How to spawn `cmd` with `args` on this platform: Windows .cmd shims go through the shell, quoted. */
 export function spawnSpec(cmd: Command, args: string[], platform: NodeJS.Platform = process.platform): { file: string; args: string[]; shell: boolean } {
   const all = [...cmd.args, ...args]
-  const viaShell = platform === 'win32' && (cmd.command === 'npx' || /\.(cmd|bat)$/i.test(cmd.command))
+  const viaShell = platform === 'win32' && /\.(cmd|bat)$/i.test(cmd.command)
   return viaShell ? { file: [cmd.command, ...all].map(cmdQuote).join(' '), args: [], shell: true } : { file: cmd.command, args: all, shell: false }
 }
 
