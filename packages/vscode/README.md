@@ -14,7 +14,7 @@ Chat with the [Hesdor](https://github.com/ksjxixi-gif/Hesdor) coding agent from 
 
 ## Requirements
 
-Install the CLI (`npm install -g @dean_overlord/hesdor`, or a standalone binary from the releases page) and run `hesdor setup` once. If `hesdor` is not on your PATH the extension falls back to `npx -y @dean_overlord/hesdor`, which needs Node.js 22 or newer.
+Install the CLI with the install script (see the main README) and run `hesdor setup` once. If the extension can't find `hesdor`, the chat shows an **Install Hesdor** button that opens a terminal, installs the standalone binary, and runs `hesdor setup`. A CLI somewhere else can be set with `hesdor.path`.
 
 ## Settings
 
