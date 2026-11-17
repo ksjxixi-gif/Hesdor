@@ -6,7 +6,7 @@ When the editor offers file access (ACP `fs/read_text_file` and `fs/write_text_f
 
 ## VS Code
 
-The Hesdor extension (`packages/vscode`, see its [README](../packages/vscode/README.md)) adds a Hesdor view to the activity bar. It starts `hesdor acp` (from PATH, `hesdor.path`, or `npx -y @dean_overlord/hesdor`), streams the conversation, opens proposed changes in VS Code's diff editor with Allow and Reject in the chat, writes edits through the editor so Undo works, attaches the editor selection with **Hesdor: Add Selection to Chat**, and runs `hesdor setup` in a terminal when no key is configured. Extra CLI flags go in `hesdor.args`. It is not on the Marketplace yet: build it with `pnpm --filter hesdor-vscode package` and install the `.vsix` with **Extensions: Install from VSIX…**.
+The Hesdor extension (`packages/vscode`, see its [README](../packages/vscode/README.md)) adds a Hesdor view to the activity bar. It starts `hesdor acp` (from `hesdor.path`, PATH, or the install script's default folder, and offers to install the CLI when none is found), streams the conversation, opens proposed changes in VS Code's diff editor with Allow and Reject in the chat, writes edits through the editor so Undo works, attaches the editor selection with **Hesdor: Add Selection to Chat**, and runs `hesdor setup` in a terminal when no key is configured. Extra CLI flags go in `hesdor.args`. It is not on the Marketplace yet: build it with `pnpm --filter hesdor-vscode package` and install the `.vsix` with **Extensions: Install from VSIX…**.
 
 Any ACP client works too, for example the community [ACP Client extension](https://github.com/formulahendry/vscode-acp): add a custom agent with the command `hesdor` and the argument `acp`.
 
