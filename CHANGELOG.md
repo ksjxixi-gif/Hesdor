@@ -15,6 +15,10 @@ the published CLI package (`packages/cli`).
 - `claude-code` provider: actions Claude Code's own permission settings don't settle ask you in Hesdor's approval prompt (TUI, editors, headless `--yes`) instead of being denied.
 - `claude-code` provider: attached images (`--image`, pasted, `@file`) reach Claude Code with the prompt.
 
+### Fixed
+
+- The update check reads the latest GitHub release instead of npm, which stays at 0.1.0, so new versions are announced again. `hesdor upgrade` prints the install-script one-liner for every install method instead of an `npm install -g` that would downgrade, or winget/scoop/brew commands for packages that aren't published yet.
+
 ## [0.3.2] - 2026-11-15
 
 ### Added
