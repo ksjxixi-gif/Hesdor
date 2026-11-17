@@ -14,7 +14,7 @@ export type Item =
   | { kind: 'tool'; id: string; title: string; status: acp.ToolCallStatus; output: string; diffs: Diff[] }
   | { kind: 'notice'; severity: string; text: string }
   | { kind: 'permission'; id: number; title: string; options: acp.PermissionOption[]; diffs: Diff[]; answer?: string }
-  | { kind: 'error'; text: string; setup?: boolean }
+  | { kind: 'error'; text: string; setup?: boolean; install?: boolean }
 
 /** Everything the webview renders; the extension host owns it and posts it whole. */
 export interface ViewState {
