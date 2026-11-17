@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import * as vscode from 'vscode'
 import type * as acp from '@agentclientprotocol/sdk'
-import { NPX_FALLBACK, cmdQuote, resolveCommand, startAgent } from './agent.js'
+import { cmdQuote, installTerminal, resolveCommand, startAgent } from './agent.js'
 import type { AgentProcess, Command } from './agent.js'
 import { readTextFile, writeTextFile } from './fs-handlers.js'
 import type { EditorFiles } from './fs-handlers.js'
@@ -12,6 +12,7 @@ import type { Diff, FromView, ToView, ViewState } from './view-model.js'
 const DIFF_SCHEME = 'hesdor-diff'
 /** ACP auth_required: no provider key yet. */
 const AUTH_REQUIRED = -32000
+const NOT_INSTALLED = 'NOT_INSTALLED'
 
 export function activate(context: vscode.ExtensionContext): void {
   const chat = new ChatController(context)
@@ -174,13 +175,13 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
 
   private fail(err: unknown): void {
     const text = err instanceof Error ? err.message : String(err)
-    const setup = typeof err === 'object' && err !== null && 'code' in err && err.code === AUTH_REQUIRED
+    const code = typeof err === 'object' && err !== null && 'code' in err ? err.code : undefined
     this.log.appendLine(`error: ${text}`)
-    this.state.items.push({ kind: 'error', text, ...(setup ? { setup } : {}) })
+    this.state.items.push({ kind: 'error', text, ...(code === AUTH_REQUIRED ? { setup: true } : code === NOT_INSTALLED ? { install: true } : {}) })
     this.post()
   }
 
-  private command(): Command {
+  private command(): Command | null {
     return resolveCommand(vscode.workspace.getConfiguration('hesdor').get<string>('path', 'hesdor'))
   }
 
@@ -195,7 +196,7 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
     if (this.agent) return this.agent
     this.starting ??= (async () => {
       const cmd = this.command()
-      if (cmd === NPX_FALLBACK) this.log.appendLine('`hesdor` not found on PATH: using npx (set hesdor.path to use an installed CLI)')
+      if (!cmd) throw Object.assign(new Error('The hesdor CLI was not found on PATH. Install it, or set hesdor.path to its location.'), { code: NOT_INSTALLED })
       const args = vscode.workspace.getConfiguration('hesdor').get<string[]>('args', [])
       const agent = await startAgent(cmd, args, this.cwd(), {
         update: (n) => {
@@ -354,9 +355,17 @@ class ChatController implements vscode.WebviewViewProvider, vscode.Disposable {
 
   runSetup(): void {
     const cmd = this.command()
-    const terminal = vscode.window.createTerminal({ name: 'Hesdor setup', ...(vscode.workspace.workspaceFolders?.[0] ? { cwd: this.cwd() } : {}) })
-    // A path with spaces must be quoted for the shell; npx stays bare.
-    terminal.sendText([cmd.command === NPX_FALLBACK.command ? cmd.command : cmdQuote(cmd.command), ...cmd.args, 'setup'].join(' '))
+    const cwd = vscode.workspace.workspaceFolders?.[0] ? { cwd: this.cwd() } : {}
+    if (!cmd) {
+      // Not installed: install the binary, then run setup from its default location.
+      const { shellPath, text } = installTerminal()
+      const terminal = vscode.window.createTerminal({ name: 'Hesdor install', shellPath, ...cwd })
+      terminal.sendText(text)
+      return terminal.show()
+    }
+    const terminal = vscode.window.createTerminal({ name: 'Hesdor setup', ...cwd })
+    // A path with spaces must be quoted for the shell.
+    terminal.sendText([cmdQuote(cmd.command), ...cmd.args, 'setup'].join(' '))
     terminal.show()
   }
 }
