@@ -5,7 +5,9 @@ import { VERSION } from './args.js'
 import { configDir, writeFileAtomic } from './config.js'
 import type { HesdorConfig } from './config.js'
 
-export const PACKAGE_NAME = '@dean_overlord/hesdor'
+// shortcut: npm is frozen at 0.1.0 (account access lost), so releases live on GitHub only; switch back if npm publishing resumes.
+const LATEST_URL = 'https://api.github.com/repos/ksjxixi-gif/Hesdor/releases/latest'
+const RAW = 'https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging'
 const DAY_MS = 24 * 60 * 60 * 1000
 const TIMEOUT_MS = 2000
 
@@ -43,14 +45,15 @@ export async function readUpdateCache(): Promise<UpdateCache | null> {
   }
 }
 
-/** Plain GET of the npm dist-tag, 2 s timeout; no headers or data that identify the user. Never throws. */
+/** Plain GET of the latest GitHub release, 2 s timeout; no headers or data that identify the user. Never throws. */
 export async function refreshUpdateCache(fetchImpl: typeof fetch = fetch, now = Date.now()): Promise<void> {
   let latest: string | undefined
   try {
-    const res = await fetchImpl(`https://registry.npmjs.org/${PACKAGE_NAME}/latest`, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    const res = await fetchImpl(LATEST_URL, { signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (res.ok) {
-      const v = ((await res.json()) as { version?: unknown }).version
-      if (typeof v === 'string' && /^\d+\.\d+\.\d+/.test(v)) latest = v
+      const tag = ((await res.json()) as { tag_name?: unknown }).tag_name
+      const v = typeof tag === 'string' ? tag.replace(/^v/, '') : ''
+      if (/^\d+\.\d+\.\d+/.test(v)) latest = v
     }
   } catch {
     // offline, timeout, proxy: record the attempt anyway so we try again tomorrow, not every start
@@ -83,7 +86,7 @@ export async function updateCheckStatus(cfg: HesdorConfig): Promise<string> {
   if (off) return off
   const cache = await readUpdateCache()
   const last = cache ? `last checked ${new Date(cache.checkedAt).toISOString().slice(0, 16).replace('T', ' ')}${cache.latest ? `, latest ${cache.latest}` : ''}` : 'not checked yet'
-  return `on — once a day, interactive only, plain GET of registry.npmjs.org/${PACKAGE_NAME}/latest (${last})`
+  return `on — once a day, interactive only, plain GET of ${LATEST_URL.replace('https://', '')} (${last})`
 }
 
 export type InstallMethod = 'npx' | 'pnpm' | 'npm' | 'source' | 'binary'
@@ -98,19 +101,11 @@ export function detectInstall(script = process.argv[1] ?? '', binary = isSea()):
   return 'npm'
 }
 
-export function upgradeCommand(method: InstallMethod): string {
-  switch (method) {
-    case 'npx':
-      return `npx ${PACKAGE_NAME}@latest   (npx caches packages; @latest fetches the newest)`
-    case 'pnpm':
-      return `pnpm add -g ${PACKAGE_NAME}@latest`
-    case 'npm':
-      return `npm install -g ${PACKAGE_NAME}@latest`
-    case 'source':
-      return 'git pull && pnpm install && pnpm build   (running from a source checkout)'
-    case 'binary':
-      return 'winget upgrade hesdor | scoop update hesdor | brew upgrade hesdor, or re-run the install script (packaging/install.ps1 or install.sh)'
-  }
+export function upgradeCommand(method: InstallMethod, platform: NodeJS.Platform = process.platform): string {
+  if (method === 'source') return 'git pull && pnpm install && pnpm build   (running from a source checkout)'
+  const script = platform === 'win32' ? `irm ${RAW}/install.ps1 | iex` : `curl -fsSL ${RAW}/install.sh | sh`
+  // npm stays at 0.1.0, so `npm install -g ...@latest` would downgrade; point package-manager installs at the binary too.
+  return method === 'binary' ? script : `${script}   (npm only has 0.1.0; new releases ship as binaries — then remove the ${method} copy)`
 }
 
 /** `hesdor upgrade`: print the command for this install; never runs it. */
