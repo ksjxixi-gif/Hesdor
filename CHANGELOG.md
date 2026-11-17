@@ -18,6 +18,7 @@ the published CLI package (`packages/cli`).
 ### Fixed
 
 - The update check reads the latest GitHub release instead of npm, which stays at 0.1.0, so new versions are announced again. `hesdor upgrade` prints the install-script one-liner for every install method instead of an `npm install -g` that would downgrade, or winget/scoop/brew commands for packages that aren't published yet.
+- VS Code extension: no longer falls back to `npx -y @dean_overlord/hesdor`, which ran the stale 0.1.0 from npm. When `hesdor` isn't on PATH it looks in the install script's default folder, which also finds a CLI installed after VS Code started. If it's missing there too, the chat shows an **Install Hesdor** button that runs the install script and then `hesdor setup` in a terminal. The extension also gets its Marketplace icon.
 
 ## [0.3.2] - 2026-11-15
 
