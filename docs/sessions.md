@@ -26,4 +26,4 @@ Checkpoints let you go back within a session: see [permissions.md](permissions.m
 
 Hesdor has no telemetry. There is no hosted code execution: tools run on your machine, and prompts go only to the model provider you configure (and to role models you configure, see [roles.md](roles.md)).
 
-Interactive runs check at most once a day for a newer release with a plain GET to `registry.npmjs.org`, send no identifying data, and show a notice on the next start. Turn it off with `HESDOR_NO_UPDATE_CHECK=1` or `"updateCheck": false`; it is always off in CI and headless runs. `hesdor upgrade` prints the upgrade command for your install method.
+Interactive runs check at most once a day for a newer release with a plain GET to the GitHub releases API (`api.github.com`), send no identifying data, and show a notice on the next start. Turn it off with `HESDOR_NO_UPDATE_CHECK=1` or `"updateCheck": false`; it is always off in CI and headless runs. `hesdor upgrade` prints the upgrade command for your install method.
