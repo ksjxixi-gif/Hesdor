@@ -183,6 +183,8 @@ function renderItem(item: Item, index: number): Node {
       const box = el('div', 'error', item.text)
       box.setAttribute('role', 'alert')
       if (item.setup) box.append(button('Run hesdor setup', () => send({ type: 'setup' }), 'primary'))
+      // Same message: runSetup installs first when the CLI is missing.
+      if (item.install) box.append(button('Install Hesdor', () => send({ type: 'setup' }), 'primary'))
       return box
     }
   }
