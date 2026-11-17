@@ -10,7 +10,7 @@ beforeEach(() => {
 
 const DAY = 24 * 60 * 60 * 1000
 const okFetch = (version: string) =>
-  vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ version }), { status: 200 })) as unknown as typeof fetch & ReturnType<typeof vi.fn>
+  vi.fn(async (_url: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({ tag_name: `v${version}` }), { status: 200 })) as unknown as typeof fetch & ReturnType<typeof vi.fn>
 const opts = { env: {}, version: '0.1.0' }
 const settle = () => new Promise((r) => setTimeout(r, 20))
 
@@ -22,7 +22,7 @@ describe('update check', () => {
     await vi.waitFor(async () => expect((await readUpdateCache())?.latest).toBe('0.2.0'))
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]!
-    expect(url).toBe('https://registry.npmjs.org/@dean_overlord/hesdor/latest')
+    expect(url).toBe('https://api.github.com/repos/ksjxixi-gif/Hesdor/releases/latest')
     expect(Object.keys(init ?? {})).toEqual(['signal']) // a plain GET: no headers, no body
     expect(await updateNotice({}, { ...opts, fetch: fetchMock, now: 2_000 })).toContain('0.2.0 is available')
     expect(fetchMock).toHaveBeenCalledTimes(1) // cached for 24 h
@@ -74,8 +74,10 @@ describe('upgrade command', () => {
     expect(detectInstall('/home/me/.local/share/pnpm/global/5/.pnpm/@dean_overlord+hesdor@0.1.0/node_modules/@dean_overlord/hesdor/bin/hesdor.js')).toBe('pnpm')
     expect(detectInstall('/home/me/.npm/_npx/1a2b3c/node_modules/@dean_overlord/hesdor/bin/hesdor.js')).toBe('npx')
     expect(detectInstall('/src/Hesdor/packages/cli/bin/hesdor.js')).toBe('source')
-    expect(upgradeCommand('npm')).toBe('npm install -g @dean_overlord/hesdor@latest')
-    expect(upgradeCommand('pnpm')).toBe('pnpm add -g @dean_overlord/hesdor@latest')
-    expect(upgradeCommand('npx')).toMatch(/^npx @dean_overlord\/hesdor@latest/)
+    expect(upgradeCommand('binary', 'win32')).toBe('irm https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging/install.ps1 | iex')
+    expect(upgradeCommand('binary', 'linux')).toBe('curl -fsSL https://raw.githubusercontent.com/ksjxixi-gif/Hesdor/main/packaging/install.sh | sh')
+    // npm is frozen at 0.1.0: never suggest `npm install -g ...@latest`, which would downgrade
+    expect(upgradeCommand('npm', 'darwin')).toMatch(/^curl .*install\.sh \| sh .*remove the npm copy/)
+    expect(upgradeCommand('npx', 'win32')).toMatch(/^irm .*install\.ps1 \| iex .*remove the npx copy/)
   })
 })
